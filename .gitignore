@@ -62,6 +62,7 @@ docs/_build/
 auto-save-list
 tramp
 .\#*
+flycheck_*
 
 # Org-mode
 .org-id-locations

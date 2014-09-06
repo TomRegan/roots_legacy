@@ -19,6 +19,7 @@ import zipfile
 import logging
 import xml.etree.ElementTree as ET
 import yaml
+import re
 
 from os import path
 from os import walk
@@ -50,6 +51,8 @@ def _isbn(number, old_length=0):
     """Return an ISBN given a (possibly malformed) string
     """
     length = len(number)
+    if length == 0:
+        return None
     if length == old_length:
         return int(number)
     if number.isdigit() and (length == 13 or length == 10):
@@ -86,7 +89,8 @@ def move_to_library(srcpath, book):
         return
     destination_dir = path.join(config['directory'], book['author'])
     destination_file = "%s.%s" % (book['title'], "epub")
-    destpath = path.join(destination_dir, destination_file)
+    # FIXME --- fewer path.joins please
+    destpath = path.join(destination_dir, _sanitize_path(destination_file))
     try:
         if not path.exists(destination_dir):
             makedirs(destination_dir)
@@ -98,6 +102,78 @@ def move_to_library(srcpath, book):
         copy(srcpath, destpath)
     except IOError, e:
         print "Error copying %s (%s)" % (srcpath, e.errno)
+
+
+def _sanitize_path(srcpath, replacements=None):
+    """Takes a path (as a Unicode string) and makes sure that it is
+    legal. Returns a new path. Only works with fragments; won't work
+    reliably on Windows when a path begins with a drive letter. Path
+    separators (including altsep!) should already be cleaned from the
+    path components. If replacements is specified, it is used *instead*
+    of the default set of replacements; it must be a list of (compiled
+    regex, replacement string) pairs.
+    """
+    replacements = replacements or [
+        (re.compile(ur'[\\/]'), u'_'),  # / and \ -- forbidden everywhere.
+        (re.compile(ur'^\.'), u'_'),  # Leading dot (hidden files on Unix).
+        (re.compile(ur'[\x00-\x1f]'), u''),  # Control characters.
+        (re.compile(ur'[<>:"\?\*\|]'), u'_'),  # Windows "reserved characters".
+        (re.compile(ur'\.$'), u'_'),  # Trailing dots.
+        (re.compile(ur'\s+$'), u''),  # Trailing whitespace.
+    ]
+    comps = _components(srcpath)
+    if not comps:
+        return ''
+    for i, comp in enumerate(comps):
+        for regex, repl in replacements:
+            comp = regex.sub(repl, comp)
+        comps[i] = comp
+    return path.join(*comps)
+
+
+def _components(srcpath):
+    """Return a list of the path components in path. For instance:
+
+       >>> components('/a/b/c')
+       ['a', 'b', 'c']
+
+    The argument should *not* be the result of a call to `syspath`.
+    """
+    comps = []
+    ances = _ancestry(srcpath)
+    for anc in ances:
+        comp = path.basename(anc)
+        if comp:
+            comps.append(comp)
+        else:  # root
+            comps.append(anc)
+    last = path.basename(srcpath)
+    if last:
+        comps.append(last)
+    return comps
+
+
+def _ancestry(srcpath):
+    """Return a list consisting of path's parent directory, its
+    grandparent, and so on. For instance:
+
+       >>> ancestry('/a/b/c')
+       ['/', '/a', '/a/b']
+
+    The argument should *not* be the result of a call to `syspath`.
+    """
+    out = []
+    last_path = None
+    while srcpath:
+        srcpath = path.dirname(srcpath)
+        if srcpath == last_path:
+            break
+        last_path = srcpath
+        if srcpath:
+            # don't yield ''
+            out.insert(0, srcpath)
+    return out
+
 
 def usage(message=None):
     """Prints a usage message
