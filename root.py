@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding utf-8 -*-
 #   Copyright 2014 Tom Regan
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +17,6 @@
 
 import sys
 import zipfile
-import logging
 import xml.etree.ElementTree as ET
 import yaml
 import re
@@ -25,7 +25,7 @@ from os import path
 from os import walk
 from os import makedirs
 from os.path import join
-from shutil import copy2 as copy
+from shutil import copy2 as _copy
 
 
 def load_metadata(epub_filename, search):
@@ -37,7 +37,7 @@ def load_metadata(epub_filename, search):
         meta_data = None
         try:
             meta_data = epub_file.read("META-INF/container.xml")
-        except Exception, e:
+        except Exception:
             print "Could not locate a container file in the epub bundle"
             return
         meta_xml = ET.fromstring(meta_data)
@@ -77,14 +77,14 @@ def load_ops_data(xml_data, search):
         "ISBN": isbn is not None and _isbn(isbn.text) or None
     }
 
-def move_to_library(srcpath, book):
+def move_to_library(srcpath, book, move=_copy):
     """Move files to the library
     """
     config = None
     try:
         with open("_config.yaml") as config_file:
             config = yaml.safe_load(config_file)
-    except Exception, e:
+    except Exception:
         print "Failed to load configuration"
         return
     destination_dir = path.join(config['directory'], book['author'])
@@ -94,14 +94,14 @@ def move_to_library(srcpath, book):
     try:
         if not path.exists(destination_dir):
             makedirs(destination_dir)
-    except OSError, e:
+    except OSError:
         print "Error creating path %s" % destination_dir
         return
     print "%s ->\n%s" % (path.basename(srcpath), destpath)
     try:
-        copy(srcpath, destpath)
-    except IOError, e:
-        print "Error copying %s (%s)" % (srcpath, e.errno)
+        move(srcpath, destpath)
+    except IOError, ioerror:
+        print "Error copying %s (%s)" % (srcpath, ioerror.errno)
 
 
 def _sanitize_path(srcpath, replacements=None):
@@ -184,25 +184,25 @@ def usage(message=None):
 Do stuff
 """
 
-def main(args):
-    """Does the main things."""
+def do_import(srcpath, search):
+    """TODO"""
+    count = 0
+    for (srcpath, dirnames, filenames) in walk(srcpath):
+        for filename in filenames:
+            if filename.endswith(".epub"):
+                filepath = join(srcpath, filename)
+                content_xml = load_metadata(filepath, search)
+                if content_xml is None:
+                    print "Failed to process %s" % filename
+                    continue
+                book = load_ops_data(content_xml, search)
+                move_to_library(filepath, book)
+                count += 1
+    print "Imported %s" % count, count is not 1 and "books" or "book"
 
-    if len(args) < 2:
-        usage()
-        return
 
-    command = args[1]
-
-    if command not in ["import"]:
-        usage("%s is not a command" % command)
-        return
-
-    if len(args) < 3:
-        usage("%d is not the right number of arguments for %s"
-              % (len(args) - 2, command))
-        return
-
-    dirpath = args[2]
+def do_command(cmd, args):
+    """TODO"""
 
     def locate_element(x, y):
         if x is None or y is None:
@@ -212,17 +212,25 @@ def main(args):
             return
         return elements[0]
 
+    if cmd == "import":
+        if len(args) < 1:
+            usage("%d is not the right number of arguments for %s"
+                  % (len(args), cmd))
+            return
+        do_import(args[0], locate_element)
+    elif cmd == "reimport":
+        pass
+    else:
+        usage("%s is not a command" % cmd)
 
-    for (dirpath, dirnames, filenames) in walk(dirpath):
-        for filename in filenames:
-            if filename.endswith(".epub"):
-                filepath = join(dirpath, filename)
-                content_xml = load_metadata(filepath, search=locate_element)
-                if content_xml is None:
-                    print "Failed to process %s" % filename
-                    continue
-                book = load_ops_data(content_xml, search=locate_element)
-                move_to_library(filepath, book)
+
+def main(args):
+    """Does the main things."""
+    if len(args) < 2:
+        usage()
+        return
+    do_command(args[1], args[2:])
+
 
 if __name__ == '__main__':
     main(sys.argv)
