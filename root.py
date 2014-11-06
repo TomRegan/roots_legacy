@@ -29,23 +29,25 @@ from shutil import copy2 as _copy
 
 
 def load_metadata(epub_filename, search):
-    """Reads an epub file and returns its OPS / OEBPS blob"""
+    """Reads an epub file and returns its OPS / OEBPS blob
+    """
     if not zipfile.is_zipfile(epub_filename):
-        print "%s is not an epub file" % epub_filename
+        print "'%s' is not a .epub file" % epub_filename.replace("./", "")
         return
     with zipfile.ZipFile(epub_filename, 'r') as epub_file:
         meta_data = None
         try:
             meta_data = epub_file.read("META-INF/container.xml")
         except Exception:
-            print "Could not locate a container file in the epub bundle"
+            print "Could not locate a container file in '%s'" % epub_filename
             return
         meta_xml = ET.fromstring(meta_data)
         full_path = search(meta_xml, "rootfile")
         if full_path is None:
-            print "Could not locate a metadata file in the epub bundle"
+            print "Could not locate a metadata file in '%s'" % epub_filename
             return
         return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
+
 
 def _isbn(number, old_length=0):
     """Return an ISBN given a (possibly malformed) string
@@ -59,23 +61,26 @@ def _isbn(number, old_length=0):
         return int(number)
     return _isbn(''.join([x for x in number if x.isdigit()]), length)
 
+
 def _author(string):
     """Return the normalised author name
     """
     name = string.split(',')
-    return len(name) == 1  and string or ' '.join([name[1], name[0]]).strip()
+    return len(name) == 1 and string or ' '.join([name[1], name[0]]).strip()
+
 
 def load_ops_data(xml_data, search):
     """Constructs a dictionary from OPS XML data
     """
-    title = search(xml_data, "title")
-    author = search(xml_data, "creator")
-    isbn = search(xml_data, "identifier")
+    title = search(xml_data, "title") or ""
+    author = search(xml_data, "creator") or ""
+    isbn = search(xml_data, "identifier") or ""
     return {
-        "title": title is None and None or title.text,
-        "author": author is None and None or _author(author.text),
-        "ISBN": isbn is not None and _isbn(isbn.text) or None
+        "title": title,
+        "author": _author(author),
+        "ISBN": _isbn(isbn)
     }
+
 
 def move_to_library(srcpath, book, move=_copy):
     """Move files to the library
@@ -89,13 +94,12 @@ def move_to_library(srcpath, book, move=_copy):
         return
     destination_dir = path.join(config['directory'], book['author'])
     destination_file = "%s.%s" % (book['title'], "epub")
-    # FIXME --- fewer path.joins please
     destpath = path.join(destination_dir, _sanitize_path(destination_file))
     try:
         if not path.exists(destination_dir):
             makedirs(destination_dir)
     except OSError:
-        print "Error creating path %s" % destination_dir
+        print "Error creating path '%s'" % destination_dir
         return
     print "%s ->\n%s" % (path.basename(srcpath), destpath)
     try:
@@ -106,17 +110,12 @@ def move_to_library(srcpath, book, move=_copy):
 
 def _sanitize_path(srcpath, replacements=None):
     """Takes a path (as a Unicode string) and makes sure that it is
-    legal. Returns a new path. Only works with fragments; won't work
-    reliably on Windows when a path begins with a drive letter. Path
-    separators (including altsep!) should already be cleaned from the
-    path components. If replacements is specified, it is used *instead*
-    of the default set of replacements; it must be a list of (compiled
-    regex, replacement string) pairs.
+    legal.
     """
     replacements = replacements or [
         (re.compile(ur'[\\/]'), u'_'),  # / and \ -- forbidden everywhere.
-        (re.compile(ur'^\.'), u'_'),  # Leading dot (hidden files on Unix).
-        (re.compile(ur'[\x00-\x1f]'), u''),  # Control characters.
+        (re.compile(ur'^\.'), u'_'),    # Leading dot (hidden files on Unix).
+        (re.compile(ur'[\x00-\x1f]'), u''),    # Control characters.
         (re.compile(ur'[<>:"\?\*\|]'), u'_'),  # Windows "reserved characters".
         (re.compile(ur'\.$'), u'_'),  # Trailing dots.
         (re.compile(ur'\s+$'), u''),  # Trailing whitespace.
@@ -184,16 +183,17 @@ def usage(message=None):
 Do stuff
 """
 
+
 def do_import(srcpath, search):
     """TODO"""
     count = 0
-    for (srcpath, dirnames, filenames) in walk(srcpath):
+    for srcpath, _, filenames in walk(srcpath):
         for filename in filenames:
             if filename.endswith(".epub"):
                 filepath = join(srcpath, filename)
                 content_xml = load_metadata(filepath, search)
                 if content_xml is None:
-                    print "Failed to process %s" % filename
+                    print "Failed to process '%s'" % filename
                     continue
                 book = load_ops_data(content_xml, search)
                 move_to_library(filepath, book)
@@ -203,20 +203,21 @@ def do_import(srcpath, search):
 
 def do_command(cmd, args):
     """TODO"""
-
     def locate_element(x, y):
         if x is None or y is None:
             return
         elements = [e for e in x.iter() if e.tag.endswith(y)]
         if elements is None or len(elements) < 1:
             return
-        return elements[0]
+        return elements[0].text or elements[0]
 
     if cmd == "import":
         if len(args) < 1:
             usage("%d is not the right number of arguments for %s"
                   % (len(args), cmd))
             return
+        if path.isfile(args[0]):
+            usage("source path should not be a file (%s)" % args[0])
         do_import(args[0], locate_element)
     elif cmd == "reimport":
         pass
