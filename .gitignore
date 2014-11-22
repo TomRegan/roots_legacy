@@ -13,6 +13,7 @@ build/
 develop-eggs/
 dist/
 eggs/
+include/
 lib/
 lib64/
 parts/
@@ -53,7 +54,6 @@ coverage.xml
 docs/_build/
 
 
-# -*- mode: gitignore; -*-
 *~
 \#*\#
 /.emacs.desktop

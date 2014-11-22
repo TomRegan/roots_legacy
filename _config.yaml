@@ -1,2 +1,4 @@
 directory: /Volumes/books/epub
-data: ~/
+
+import:
+  overwrite: no

@@ -13,9 +13,16 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-"""Dumps a bunch of data about epub files"""
+"""roots
 
-import sys
+Usage:
+  root import <path>
+  root (-h | --help | --version)
+
+Options:
+  -h --help  show this
+"""
+
 import zipfile
 import xml.etree.ElementTree as ET
 import yaml
@@ -26,6 +33,7 @@ from os import walk
 from os import makedirs
 from os.path import join
 from shutil import copy2 as _copy
+from docopt import docopt
 
 
 def load_metadata(epub_filename, search):
@@ -82,30 +90,28 @@ def load_ops_data(xml_data, search):
     }
 
 
-def move_to_library(srcpath, book, move=_copy):
+def move_to_library(srcpath, book, configuration=None, move=_copy):
     """Move files to the library
     """
-    config = None
-    try:
-        with open("_config.yaml") as config_file:
-            config = yaml.safe_load(config_file)
-    except Exception:
-        print "Failed to load configuration"
-        return
-    destination_dir = path.join(config['directory'], book['author'])
-    destination_file = "%s.%s" % (book['title'], "epub")
-    destpath = path.join(destination_dir, _sanitize_path(destination_file))
+    destination_dir = path.join(configuration['directory'], book['author'])
+    destination_file = _sanitize_path(book['title'] + '.epub')
     try:
         if not path.exists(destination_dir):
             makedirs(destination_dir)
     except OSError:
         print "Error creating path '%s'" % destination_dir
         return
+    destpath = path.join(destination_dir, destination_file)
+    if configuration['import']['overwrite'] is False and path.isfile(destpath):
+        print 'Not importing %s because overwrite is not configured.' % srcpath
+        return False
     print "%s ->\n%s" % (path.basename(srcpath), destpath)
     try:
         move(srcpath, destpath)
     except IOError, ioerror:
         print "Error copying %s (%s)" % (srcpath, ioerror.errno)
+        return False
+    return True
 
 
 def _sanitize_path(srcpath, replacements=None):
@@ -174,20 +180,11 @@ def _ancestry(srcpath):
     return out
 
 
-def usage(message=None):
-    """Prints a usage message
-    """
-    if message is not None:
-        print message
-    print """Usage
-Do stuff
-"""
-
-
-def do_import(srcpath, search):
+def do_import(configuration):
     """TODO"""
+    search = configuration['search']
     count = 0
-    for srcpath, _, filenames in walk(srcpath):
+    for srcpath, _, filenames in walk(configuration['srcpath']):
         for filename in filenames:
             if filename.endswith(".epub"):
                 filepath = join(srcpath, filename)
@@ -196,12 +193,12 @@ def do_import(srcpath, search):
                     print "Failed to process '%s'" % filename
                     continue
                 book = load_ops_data(content_xml, search)
-                move_to_library(filepath, book)
-                count += 1
+                if move_to_library(filepath, book, configuration):
+                    count += 1
     print "Imported %s" % count, count is not 1 and "books" or "book"
 
 
-def do_command(cmd, args):
+def do_command(arguments, configuration):
     """TODO"""
     def locate_element(x, y):
         if x is None or y is None:
@@ -211,27 +208,33 @@ def do_command(cmd, args):
             return
         return elements[0].text or elements[0]
 
-    if cmd == "import":
-        if len(args) < 1:
-            usage("%d is not the right number of arguments for %s"
-                  % (len(args), cmd))
+    configuration['search'] = locate_element
+    if arguments['import']:
+        srcpath = arguments['<path>']
+        if path.isfile(srcpath):
+            print "source path should not be a file (%s)" % srcpath
             return
-        if path.isfile(args[0]):
-            usage("source path should not be a file (%s)" % args[0])
-        do_import(args[0], locate_element)
-    elif cmd == "reimport":
-        pass
-    else:
-        usage("%s is not a command" % cmd)
+        configuration['srcpath'] = srcpath
+        do_import(configuration)
 
 
-def main(args):
-    """Does the main things."""
-    if len(args) < 2:
-        usage()
-        return
-    do_command(args[1], args[2:])
+def _configuration():
+    """Loads YAML configuration.
+    """
+    try:
+        with open("_config.yaml") as config_file:
+            return yaml.safe_load(config_file)
+    except Exception:
+        print "Failed to load configuration"
+        return False
+
+
+def main():
+    """TODO"""
+    arguments = docopt(__doc__, version='0.0.1')
+    configuration = _configuration()
+    do_command(arguments, configuration)
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()
