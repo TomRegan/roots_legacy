@@ -12,7 +12,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-"""Unit Tests
+"""Unit Tests.
 """
 
 import unittest
@@ -25,6 +25,21 @@ class TestStringManipulation(unittest.TestCase):
     def test_author_normalisation(self):
         self.assertEqual("Foo Bar", root._author("Bar, Foo"))
         self.assertEqual("Eggs Spam", root._author("Spam, Eggs"))
+
+
+    def test_path_normalisation(self):
+        c = root._configuration()
+        [self.assertEqual(e, root._clean_path(a, c)) for e, a in
+         [
+             ("Space_ The Final Frontier", "Space: The Final Frontier"),
+             ("Spaces, The Final Frontier", "Spaces, The Final Frontier   "),
+             ("_invisible", ".invisible"),
+             ("visible_", "visible."),
+             ("windows___nix_", "windows<>*nix?"),
+             ("put _that_ in your _", "put _that_ in your |"),
+             ("valid.epub", "valid.epub")
+         ]
+        ]
 
 
 if __name__ == '__main__':

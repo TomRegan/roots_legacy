@@ -94,7 +94,7 @@ def move_to_library(srcpath, book, configuration=None, move=_copy):
     """Move files to the library
     """
     destination_dir = path.join(configuration['directory'], book['author'])
-    destination_file = _sanitize_path(book['title'] + '.epub')
+    destination_file = _clean_path(book['title'] + '.epub', configuration)
     try:
         if not path.exists(destination_dir):
             makedirs(destination_dir)
@@ -114,70 +114,14 @@ def move_to_library(srcpath, book, configuration=None, move=_copy):
     return True
 
 
-def _sanitize_path(srcpath, replacements=None):
+def _clean_path(srcpath, configuration):
     """Takes a path (as a Unicode string) and makes sure that it is
     legal.
     """
-    replacements = replacements or [
-        (re.compile(ur'[\\/]'), u'_'),  # / and \ -- forbidden everywhere.
-        (re.compile(ur'^\.'), u'_'),    # Leading dot (hidden files on Unix).
-        (re.compile(ur'[\x00-\x1f]'), u''),    # Control characters.
-        (re.compile(ur'[<>:"\?\*\|]'), u'_'),  # Windows "reserved characters".
-        (re.compile(ur'\.$'), u'_'),  # Trailing dots.
-        (re.compile(ur'\s+$'), u''),  # Trailing whitespace.
-    ]
-    comps = _components(srcpath)
-    if not comps:
-        return ''
-    for i, comp in enumerate(comps):
-        for regex, repl in replacements:
-            comp = regex.sub(repl, comp)
-        comps[i] = comp
-    return path.join(*comps)
-
-
-def _components(srcpath):
-    """Return a list of the path components in path. For instance:
-
-       >>> components('/a/b/c')
-       ['a', 'b', 'c']
-
-    The argument should *not* be the result of a call to `syspath`.
-    """
-    comps = []
-    ances = _ancestry(srcpath)
-    for anc in ances:
-        comp = path.basename(anc)
-        if comp:
-            comps.append(comp)
-        else:  # root
-            comps.append(anc)
-    last = path.basename(srcpath)
-    if last:
-        comps.append(last)
-    return comps
-
-
-def _ancestry(srcpath):
-    """Return a list consisting of path's parent directory, its
-    grandparent, and so on. For instance:
-
-       >>> ancestry('/a/b/c')
-       ['/', '/a', '/a/b']
-
-    The argument should *not* be the result of a call to `syspath`.
-    """
-    out = []
-    last_path = None
-    while srcpath:
-        srcpath = path.dirname(srcpath)
-        if srcpath == last_path:
-            break
-        last_path = srcpath
-        if srcpath:
-            # don't yield ''
-            out.insert(0, srcpath)
-    return out
+    replacements = configuration['import']['replacements']
+    for expression, replacement in replacements.iteritems():
+        srcpath = expression.sub(replacement, srcpath)
+    return srcpath
 
 
 def do_import(configuration):
@@ -218,21 +162,54 @@ def do_command(arguments, configuration):
         do_import(configuration)
 
 
+def _update(defaults, updates):
+    """Updates a nested dictionary
+    """
+    for k, v in updates.iteritems():
+        if type(v) is dict:
+            replacement = _update(defaults.get(k, {}), v)
+            defaults[k] = replacement
+        else:
+            defaults[k] = updates[k]
+    return defaults
+
+
 def _configuration():
     """Loads YAML configuration.
     """
+    custom = {}
+    defaults = {
+        'directory': '~/Books',
+        'import': {
+            'replacements': {
+                r'[\\/]': '_',
+                r'^\.': '_',
+                r'[\x00-\x1f]': '',
+                r'[<>:"\?\*\|]': '_',
+                r'\.$': '_',
+                r'\s+$': ''
+            },
+            'overwrite': False
+        }
+    }
     try:
         with open("_config.yaml") as config_file:
-            return yaml.safe_load(config_file)
+            custom = yaml.safe_load(config_file)
     except Exception:
         print "Failed to load configuration"
-        return False
+    configuration = _update(defaults, custom)
+    _compile_regex(configuration)
+    return configuration
 
+def _compile_regex(configuration):
+    replacements = configuration['import']['replacements']
+    configuration['import']['replacements'] = {re.compile(k):v for k, v in replacements.iteritems()}
 
 def main():
     """TODO"""
     arguments = docopt(__doc__, version='0.0.1')
     configuration = _configuration()
+
     do_command(arguments, configuration)
 
 
