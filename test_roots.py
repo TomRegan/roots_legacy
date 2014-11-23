@@ -28,7 +28,7 @@ class TestStringManipulation(unittest.TestCase):
 
 
     def test_path_normalisation(self):
-        c = root._configuration()
+        c = root._configuration()  # test defaults
         [self.assertEqual(e, root._clean_path(a, c)) for e, a in
          [
              ("Space_ The Final Frontier", "Space: The Final Frontier"),

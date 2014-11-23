@@ -34,6 +34,7 @@ from os import makedirs
 from os.path import join
 from shutil import copy2 as _copy
 from docopt import docopt
+from blessings import Terminal
 
 
 def load_metadata(epub_filename, search):
@@ -90,29 +91,6 @@ def load_ops_data(xml_data, search):
     }
 
 
-def move_to_library(srcpath, book, configuration=None, move=_copy):
-    """Move files to the library
-    """
-    destination_dir = path.join(configuration['directory'], book['author'])
-    destination_file = _clean_path(book['title'] + '.epub', configuration)
-    try:
-        if not path.exists(destination_dir):
-            makedirs(destination_dir)
-    except OSError:
-        print "Error creating path '%s'" % destination_dir
-        return
-    destpath = path.join(destination_dir, destination_file)
-    if configuration['import']['overwrite'] is False and path.isfile(destpath):
-        print 'Not importing %s because overwrite is not configured.' % srcpath
-        return False
-    print "%s ->\n%s" % (path.basename(srcpath), destpath)
-    try:
-        move(srcpath, destpath)
-    except IOError, ioerror:
-        print "Error copying %s (%s)" % (srcpath, ioerror.errno)
-        return False
-    return True
-
 
 def _clean_path(srcpath, configuration):
     """Takes a path (as a Unicode string) and makes sure that it is
@@ -126,20 +104,60 @@ def _clean_path(srcpath, configuration):
 
 def do_import(configuration):
     """TODO"""
-    search = configuration['search']
-    count = 0
-    for srcpath, _, filenames in walk(configuration['srcpath']):
-        for filename in filenames:
-            if filename.endswith(".epub"):
-                filepath = join(srcpath, filename)
-                content_xml = load_metadata(filepath, search)
-                if content_xml is None:
-                    print "Failed to process '%s'" % filename
-                    continue
-                book = load_ops_data(content_xml, search)
-                if move_to_library(filepath, book, configuration):
-                    count += 1
+    moves = _consider_moves(configuration)
+    count = move_to_library(moves, configuration)
     print "Imported %s" % count, count is not 1 and "books" or "book"
+
+
+def _consider_moves(configuration):
+    """Determines the files to be moved and their destinations
+    """
+    search = configuration['search']
+    library = configuration['directory']
+    moves = []
+    for basepath, _, filenames in walk(configuration['srcpath']):
+        for filename in filenames:
+            if not filename.endswith(".epub"):
+                continue
+            srcpath = join(basepath, filename)
+            content_xml = load_metadata(srcpath, search)
+            if content_xml is None:
+                print "Failed to process '%s'" % filename
+                continue
+            book = load_ops_data(content_xml, search)
+            destination_dir = path.join(library, book['author'])
+            destination_file = _clean_path(
+                book['title'] + '.epub', configuration)
+            destpath = path.join(destination_dir, destination_file)
+            moves.append((srcpath, destpath, destination_dir))
+    return moves
+
+def move_to_library(moves, configuration, move=_copy):
+    """Move files to the library
+    """
+    overwrite = configuration['import']['overwrite']
+    terminal = configuration['terminal']
+    count = 0
+    for srcpath, destpath, destination_dir in moves:
+        try:
+            if not path.exists(destination_dir):
+                makedirs(destination_dir)
+        except OSError:
+            print "Error creating path '%s'" % destination_dir
+            continue
+        if not overwrite and path.isfile(destpath):
+            print ("%sNot importing %s'%s'%s because it already exists in the "
+                   "library.%s" % (terminal.red, terminal.yellow, srcpath,
+                                   terminal.red, terminal.normal))
+            continue
+        print "%s ->\n%s" % (path.basename(srcpath), destpath)
+        try:
+            move(srcpath, destpath)
+            count += 1
+        except IOError, ioerror:
+            print "Error copying %s (%s)" % (srcpath, ioerror.errno)
+            continue
+    return count
 
 
 def do_command(arguments, configuration):
@@ -153,6 +171,7 @@ def do_command(arguments, configuration):
         return elements[0].text or elements[0]
 
     configuration['search'] = locate_element
+    configuration['terminal'] = Terminal()
     if arguments['import']:
         srcpath = arguments['<path>']
         if path.isfile(srcpath):
@@ -178,7 +197,7 @@ def _configuration():
     """Loads YAML configuration.
     """
     custom = {}
-    defaults = {
+    default = {
         'directory': '~/Books',
         'import': {
             'replacements': {
@@ -197,19 +216,24 @@ def _configuration():
             custom = yaml.safe_load(config_file)
     except Exception:
         print "Failed to load configuration"
-    configuration = _update(defaults, custom)
+    configuration = _update(default, custom)
     _compile_regex(configuration)
     return configuration
 
+
 def _compile_regex(configuration):
+    """Compiles regexes in the configuration
+    """
     replacements = configuration['import']['replacements']
-    configuration['import']['replacements'] = {re.compile(k):v for k, v in replacements.iteritems()}
+    configuration['import']['replacements'] = {
+        re.compile(k): v for k, v in replacements.iteritems()
+    }
+
 
 def main():
     """TODO"""
     arguments = docopt(__doc__, version='0.0.1')
     configuration = _configuration()
-
     do_command(arguments, configuration)
 
 
