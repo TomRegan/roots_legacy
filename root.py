@@ -27,6 +27,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 import yaml
 import re
+import blessings
 
 from os import path
 from os import walk
@@ -34,28 +35,27 @@ from os import makedirs
 from os.path import join
 from shutil import copy2 as _copy
 from docopt import docopt
-from blessings import Terminal
 
 
-def load_metadata(epub_filename, search):
-    """Reads an epub file and returns its OPS / OEBPS blob
+class Terminal(blessings.Terminal):
+    """Allows interaction with the terminal.
     """
-    if not zipfile.is_zipfile(epub_filename):
-        print "'%s' is not a .epub file" % epub_filename.replace("./", "")
-        return
-    with zipfile.ZipFile(epub_filename, 'r') as epub_file:
-        meta_data = None
-        try:
-            meta_data = epub_file.read("META-INF/container.xml")
-        except Exception:
-            print "Could not locate a container file in '%s'" % epub_filename
-            return
-        meta_xml = ET.fromstring(meta_data)
-        full_path = search(meta_xml, "rootfile")
-        if full_path is None:
-            print "Could not locate a metadata file in '%s'" % epub_filename
-            return
-        return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
+    def warn(self, msg, *args):
+        """Write a warning message to the terminal.
+        """
+        line_length = sum(len(x) for x in args)
+        fmt = ''
+        for word in msg.split():
+            line_length += len(word)
+            if line_length + len(word) > self.width:
+                fmt += '\n' + word + ' '
+                line_length = 0
+            else:
+                fmt += word + ' '
+        print (self.red +
+               fmt.replace('%s', self.yellow + "'%s'" + self.red) +
+               self.normal) % args
+
 
 
 def _isbn(number, old_length=0):
@@ -110,19 +110,19 @@ def do_import(configuration):
 
 
 def _consider_moves(configuration):
-    """Determines the files to be moved and their destinations
+    """Determines the files to be moved and their destinations.
     """
     search = configuration['search']
     library = configuration['directory']
+    terminal = configuration['terminal']
     moves = []
     for basepath, _, filenames in walk(configuration['srcpath']):
         for filename in filenames:
             if not filename.endswith(".epub"):
                 continue
             srcpath = join(basepath, filename)
-            content_xml = load_metadata(srcpath, search)
+            content_xml = load_metadata(srcpath, configuration)
             if content_xml is None:
-                print "Failed to process '%s'" % filename
                 continue
             book = load_ops_data(content_xml, search)
             destination_dir = path.join(library, book['author'])
@@ -131,6 +131,31 @@ def _consider_moves(configuration):
             destpath = path.join(destination_dir, destination_file)
             moves.append((srcpath, destpath, destination_dir))
     return moves
+
+
+def load_metadata(epub_filename, configuration):
+    """Reads an epub file and returns its OPS / OEBPS blob.
+    """
+    search = configuration['search']
+    term = configuration['terminal']
+    if not zipfile.is_zipfile(epub_filename):
+        term.warn("Not importing %s because it is not a .epub file.",
+                  epub_filename.replace("./", ""))
+        return
+    with zipfile.ZipFile(epub_filename, 'r') as epub_file:
+        meta_data = None
+        try:
+            meta_data = epub_file.read("META-INF/container.xml")
+        except Exception:
+            term.warn("Could not locate a container file in %s", epub_filename)
+            return
+        meta_xml = ET.fromstring(meta_data)
+        full_path = search(meta_xml, "rootfile")
+        if full_path is None:
+            term.warn("Could not locate a metadata file in %s", epub_filename)
+            return
+        return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
+
 
 def move_to_library(moves, configuration, move=_copy):
     """Move files to the library
@@ -143,19 +168,19 @@ def move_to_library(moves, configuration, move=_copy):
             if not path.exists(destination_dir):
                 makedirs(destination_dir)
         except OSError:
-            print "Error creating path '%s'" % destination_dir
+            terminal.warn("Error creating path %s", destination_dir)
             continue
         if not overwrite and path.isfile(destpath):
-            print ("%sNot importing %s'%s'%s because it already exists in the "
-                   "library.%s" % (terminal.red, terminal.yellow, srcpath,
-                                   terminal.red, terminal.normal))
+            terminal.warn("Not importing %s because it already exists in the "
+                          "library.", srcpath)
+
             continue
         print "%s ->\n%s" % (path.basename(srcpath), destpath)
         try:
             move(srcpath, destpath)
             count += 1
         except IOError, ioerror:
-            print "Error copying %s (%s)" % (srcpath, ioerror.errno)
+            terminal.warn("Error copying %s (%s)", srcpath, ioerror.errno)
             continue
     return count
 
