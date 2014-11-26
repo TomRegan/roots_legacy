@@ -13,14 +13,16 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-"""roots
+"""roots, version 0.0.1
 
 Usage:
   root import <path>
+  root reimport
   root (-h | --help | --version)
 
 Options:
-  -h --help  show this
+  -h --help    Show this help.
+  --version    Show version.
 """
 
 import zipfile
@@ -35,6 +37,9 @@ from os import makedirs
 from os.path import join
 from shutil import copy2 as _copy
 from docopt import docopt
+from urlparse import urljoin
+from urllib import pathname2url as to_url
+from hashlib import sha1
 
 
 class Terminal(blessings.Terminal):
@@ -57,49 +62,29 @@ class Terminal(blessings.Terminal):
                self.normal) % args
 
 
+def do_command(arguments, configuration):
+    """TODO"""
+    def locate_element(x, y):
+        if x is None or y is None:
+            return
+        elements = [e for e in x.iter() if e.tag.endswith(y)]
+        if elements is None or len(elements) < 1:
+            return
+        return elements[0].text or elements[0]
 
-def _isbn(number, old_length=0):
-    """Return an ISBN given a (possibly malformed) string
-    """
-    length = len(number)
-    if length == 0:
-        return None
-    if length == old_length:
-        return int(number)
-    if number.isdigit() and (length == 13 or length == 10):
-        return int(number)
-    return _isbn(''.join([x for x in number if x.isdigit()]), length)
-
-
-def _author(string):
-    """Return the normalised author name
-    """
-    name = string.split(',')
-    return len(name) == 1 and string or ' '.join([name[1], name[0]]).strip()
-
-
-def load_ops_data(xml_data, search):
-    """Constructs a dictionary from OPS XML data
-    """
-    title = search(xml_data, "title") or ""
-    author = search(xml_data, "creator") or ""
-    isbn = search(xml_data, "identifier") or ""
-    return {
-        "title": title,
-        "author": _author(author),
-        "ISBN": _isbn(isbn)
-    }
-
-
-
-def _clean_path(srcpath, configuration):
-    """Takes a path (as a Unicode string) and makes sure that it is
-    legal.
-    """
-    replacements = configuration['import']['replacements']
-    for expression, replacement in replacements.iteritems():
-        srcpath = expression.sub(replacement, srcpath)
-    return srcpath
+    configuration['search'] = locate_element
+    term = Terminal()
+    configuration['terminal'] = term
+    if arguments['import']:
+        srcpath = arguments['<path>']
+        if path.isfile(srcpath):
+            term.warn("source path should not be a file: %s", srcpath)
+            return
+        configuration['srcpath'] = srcpath
+        do_import(configuration)
+    elif arguments['reimport']:
+        configuration['srcpath'] = configuration['directory']
+        do_reimport(configuration)
 
 
 def do_import(configuration):
@@ -112,19 +97,16 @@ def do_import(configuration):
 def _consider_moves(configuration):
     """Determines the files to be moved and their destinations.
     """
-    search = configuration['search']
     library = configuration['directory']
-    terminal = configuration['terminal']
     moves = []
     for basepath, _, filenames in walk(configuration['srcpath']):
         for filename in filenames:
             if not filename.endswith(".epub"):
                 continue
             srcpath = join(basepath, filename)
-            content_xml = load_metadata(srcpath, configuration)
-            if content_xml is None:
+            book = _load_book_data(srcpath, configuration)
+            if book is None:
                 continue
-            book = load_ops_data(content_xml, search)
             destination_dir = path.join(library, book['author'])
             destination_file = _clean_path(
                 book['title'] + '.epub', configuration)
@@ -133,7 +115,15 @@ def _consider_moves(configuration):
     return moves
 
 
-def load_metadata(epub_filename, configuration):
+def _load_book_data(srcpath, configuration):
+    """Reads the metadata from an ebook file.
+    """
+    content_xml = _load_metadata(srcpath, configuration)
+    if content_xml is not None:
+        return _load_ops_data(content_xml, configuration)
+
+
+def _load_metadata(epub_filename, configuration):
     """Reads an epub file and returns its OPS / OEBPS blob.
     """
     search = configuration['search']
@@ -157,6 +147,50 @@ def load_metadata(epub_filename, configuration):
         return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
 
 
+def _load_ops_data(xml_data, configuration):
+    """Constructs a dictionary from OPS XML data.
+    """
+    search = configuration['search']
+    title = search(xml_data, "title") or ""
+    author = search(xml_data, "creator") or ""
+    isbn = search(xml_data, "identifier") or ""
+    return {
+        "title": title,
+        "author": _author(author),
+        "isbn": _isbn(isbn)
+    }
+
+
+def _isbn(number, old_length=0):
+    """Return an ISBN given a (possibly malformed) string.
+    """
+    length = len(number)
+    if length == 0:
+        return None
+    if length == old_length:
+        return int(number)
+    if number.isdigit() and (length == 13 or length == 10):
+        return int(number)
+    return _isbn(''.join([x for x in number if x.isdigit()]), length)
+
+
+def _author(string):
+    """Return the normalised author name.
+    """
+    name = string.split(',')
+    return len(name) == 1 and string or ' '.join([name[1], name[0]]).strip()
+
+
+def _clean_path(srcpath, configuration):
+    """Takes a path (as a Unicode string) and makes sure that it is
+    legal.
+    """
+    replacements = configuration['import']['replacements']
+    for expression, replacement in replacements.iteritems():
+        srcpath = expression.sub(replacement, srcpath)
+    return srcpath
+
+
 def move_to_library(moves, configuration, move=_copy):
     """Move files to the library
     """
@@ -173,7 +207,6 @@ def move_to_library(moves, configuration, move=_copy):
         if not overwrite and path.isfile(destpath):
             terminal.warn("Not importing %s because it already exists in the "
                           "library.", srcpath)
-
             continue
         print "%s ->\n%s" % (path.basename(srcpath), destpath)
         try:
@@ -185,37 +218,21 @@ def move_to_library(moves, configuration, move=_copy):
     return count
 
 
-def do_command(arguments, configuration):
+def do_reimport(configuration):
     """TODO"""
-    def locate_element(x, y):
-        if x is None or y is None:
-            return
-        elements = [e for e in x.iter() if e.tag.endswith(y)]
-        if elements is None or len(elements) < 1:
-            return
-        return elements[0].text or elements[0]
-
-    configuration['search'] = locate_element
-    configuration['terminal'] = Terminal()
-    if arguments['import']:
-        srcpath = arguments['<path>']
-        if path.isfile(srcpath):
-            print "source path should not be a file (%s)" % srcpath
-            return
-        configuration['srcpath'] = srcpath
-        do_import(configuration)
-
-
-def _update(defaults, updates):
-    """Updates a nested dictionary
-    """
-    for k, v in updates.iteritems():
-        if type(v) is dict:
-            replacement = _update(defaults.get(k, {}), v)
-            defaults[k] = replacement
-        else:
-            defaults[k] = updates[k]
-    return defaults
+    books = []
+    for basepath, _, filenames in walk(configuration['srcpath']):
+        for filename in filenames:
+            if not filename.endswith(".epub"):
+                continue
+            srcpath = join(basepath, filename)
+            book = _load_book_data(srcpath, configuration)
+            book['path'] = urljoin('file:', to_url(srcpath))
+            if configuration['import']['hash']:
+                with open(srcpath, 'rb') as zipfile:
+                    book['sha_hash'] = sha1(zipfile.read()).hexdigest()
+            books.append(book)
+    print books
 
 
 def _configuration():
@@ -233,7 +250,8 @@ def _configuration():
                 r'\.$': '_',
                 r'\s+$': ''
             },
-            'overwrite': False
+            'overwrite': False,
+            'hash': False
         }
     }
     try:
@@ -244,6 +262,18 @@ def _configuration():
     configuration = _update(default, custom)
     _compile_regex(configuration)
     return configuration
+
+
+def _update(defaults, updates):
+    """Updates a nested dictionary
+    """
+    for k, v in updates.iteritems():
+        if type(v) is dict:
+            replacement = _update(defaults.get(k, {}), v)
+            defaults[k] = replacement
+        else:
+            defaults[k] = updates[k]
+    return defaults
 
 
 def _compile_regex(configuration):
