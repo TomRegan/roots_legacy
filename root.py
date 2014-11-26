@@ -17,6 +17,7 @@
 Usage:
   root import <path>
   root reimport
+  root config [-p | -d | --path | --default]
   root (-h | --help | --version)
 
 Options:
@@ -83,6 +84,8 @@ def do_command(arguments, configuration):
     elif arguments['reimport']:
         configuration['srcpath'] = configuration['directory']
         do_reimport(configuration)
+    elif arguments['config']:
+        do_config(arguments, configuration)
 
 
 def do_import(configuration):
@@ -229,12 +232,26 @@ def do_reimport(configuration):
                 continue
             srcpath = join(basepath, filename)
             books.append(_load_book_data(srcpath, configuration))
-    library = path.join(configuration['configpath'], configuration['library'])
+    library = path.join(configuration['system']['configpath'],
+                        configuration['library'])
     with open(library, 'wb') as library_file:
         pickle.dump(books, library_file)
 
 
-def _configuration():
+def do_config(arguments, configuration):
+    """Prints configuration.
+    """
+    if arguments['-p'] or arguments['--path']:
+        print configuration['system']['configfile']
+    elif arguments['-d'] or arguments['--default']:
+        print yaml.dump(_configuration(default=True), default_flow_style=False)
+    else:
+        display_configuration = _configuration(display=True)
+        display_configuration.pop('system')
+        print yaml.dump(display_configuration, default_flow_style=False)
+
+
+def _configuration(default=False, display=False):
     """Loads YAML configuration.
     """
     custom = {}
@@ -254,13 +271,18 @@ def _configuration():
             'hash': False
         }
     }
+    if default:
+        return configuration
     default_config_path = path.join(
         path.expanduser('~'), '.config/roots/config.yaml')
     config_path = ''
     for config_path in [default_config_path, '_config.yaml']:
         if path.exists(config_path):
             break
-    configuration['configpath'] = path.dirname(path.abspath(config_path))
+    configuration['system'] = {
+        'configfile': path.abspath(config_path),
+        'configpath': path.dirname(path.abspath(config_path))
+    }
     try:
         with open(config_path) as config_file:
             custom = yaml.safe_load(config_file)
@@ -268,7 +290,8 @@ def _configuration():
         print "Failed to load configuration"
     if custom is not None:
         configuration = _update(configuration, custom)
-    _compile_regex(configuration)
+    if not display:
+        _compile_regex(configuration)
     return configuration
 
 
