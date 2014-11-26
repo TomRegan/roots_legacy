@@ -17,6 +17,7 @@
 Usage:
   root import <path>
   root reimport
+  root list <query>...
   root config [-p | -d | --path | --default]
   root (-h | --help | --version)
 
@@ -86,6 +87,8 @@ def do_command(arguments, configuration):
         do_reimport(configuration)
     elif arguments['config']:
         do_config(arguments, configuration)
+    elif arguments['list']:
+        do_list(arguments, configuration)
 
 
 def do_import(configuration):
@@ -314,6 +317,33 @@ def _compile_regex(configuration):
     configuration['import']['replacements'] = {
         re.compile(k): v for k, v in replacements.iteritems()
     }
+
+
+def do_list(arguments, configuration):
+    """TODO"""
+    books = []
+    library = path.join(configuration['system']['configpath'],
+                        configuration['library'])
+    with open(library, 'rb') as library_file:
+        books = pickle.load(library_file)
+    query = arguments['<query>'][0].split(':')
+    if len(query) > 1:
+        restrict = query.pop(0)
+        select = ' '.join(query + arguments['<query>'][1:])
+    else:
+        restrict = 'title'
+        select = ' '.join(arguments['<query>'])
+    results = [
+        (book['author'], book['title'])
+        for book in books
+        if restrict in book.keys()
+        and select.upper() in unicode(book[restrict]).upper()
+    ]
+    if len(results) == 0:
+        configuration['terminal'].warn('No matches for %s.', select)
+    else:
+        for result in results:
+            print "%s: %s" % result
 
 
 def main():
