@@ -13,8 +13,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-"""roots, version 0.0.1
-
+"""
 Usage:
   root import <path>
   root reimport
@@ -30,6 +29,7 @@ import xml.etree.ElementTree as ET
 import yaml
 import re
 import blessings
+import pickle
 
 from os import path, walk, makedirs
 from os.path import join, expanduser
@@ -88,7 +88,7 @@ def do_command(arguments, configuration):
 def do_import(configuration):
     """TODO"""
     moves = _consider_moves(configuration)
-    count = move_to_library(moves, configuration)
+    count = _move_to_library(moves, configuration)
     print "Imported %s" % count, count is not 1 and "books" or "book"
 
 
@@ -118,7 +118,12 @@ def _load_book_data(srcpath, configuration):
     """
     content_xml = _load_metadata(srcpath, configuration)
     if content_xml is not None:
-        return _load_ops_data(content_xml, configuration)
+        book = _load_ops_data(content_xml, configuration)
+        if configuration['import']['hash']:
+            with open(srcpath, 'rb') as zipfile:
+                book['sha_hash'] = sha1(zipfile.read()).hexdigest()
+        book['url_path'] = urljoin('file:', to_url(srcpath))
+        return book
 
 
 def _load_metadata(epub_filename, configuration):
@@ -189,10 +194,9 @@ def _clean_path(srcpath, configuration):
     return srcpath
 
 
-def move_to_library(moves, configuration, move=_copy):
+def _move_to_library(moves, configuration, move=_copy):
     """Move files to the library
     """
-    overwrite = configuration['import']['overwrite']
     terminal = configuration['terminal']
     count = 0
     for srcpath, destpath, destination_dir in moves:
@@ -202,7 +206,7 @@ def move_to_library(moves, configuration, move=_copy):
         except OSError:
             terminal.warn("Error creating path %s", destination_dir)
             continue
-        if not overwrite and path.isfile(destpath):
+        if not configuration['import']['overwrite'] and path.isfile(destpath):
             terminal.warn("Not importing %s because it already exists in the "
                           "library.", srcpath)
             continue
@@ -224,13 +228,10 @@ def do_reimport(configuration):
             if not filename.endswith(".epub"):
                 continue
             srcpath = join(basepath, filename)
-            book = _load_book_data(srcpath, configuration)
-            book['path'] = urljoin('file:', to_url(srcpath))
-            if configuration['import']['hash']:
-                with open(srcpath, 'rb') as zipfile:
-                    book['sha_hash'] = sha1(zipfile.read()).hexdigest()
-            books.append(book)
-    print books
+            books.append(_load_book_data(srcpath, configuration))
+    library = path.join(configuration['configpath'], configuration['library'])
+    with open(library, 'wb') as library_file:
+        pickle.dump(books, library_file)
 
 
 def _configuration():
@@ -238,6 +239,7 @@ def _configuration():
     """
     custom = {}
     configuration = {
+        'library': 'library.db',
         'directory': '~/Books',
         'import': {
             'replacements': {
@@ -258,6 +260,7 @@ def _configuration():
     for config_path in [default_config_path, '_config.yaml']:
         if path.exists(config_path):
             break
+    configuration['configpath'] = path.dirname(path.abspath(config_path))
     try:
         with open(config_path) as config_file:
             custom = yaml.safe_load(config_file)
