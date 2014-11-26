@@ -31,10 +31,8 @@ import yaml
 import re
 import blessings
 
-from os import path
-from os import walk
-from os import makedirs
-from os.path import join
+from os import path, walk, makedirs
+from os.path import join, expanduser
 from shutil import copy2 as _copy
 from docopt import docopt
 from urlparse import urljoin
@@ -239,7 +237,7 @@ def _configuration():
     """Loads YAML configuration.
     """
     custom = {}
-    default = {
+    configuration = {
         'directory': '~/Books',
         'import': {
             'replacements': {
@@ -254,12 +252,19 @@ def _configuration():
             'hash': False
         }
     }
+    default_config_path = path.join(
+        path.expanduser('~'), '.config/roots/config.yaml')
+    config_path = ''
+    for config_path in [default_config_path, '_config.yaml']:
+        if path.exists(config_path):
+            break
     try:
-        with open("_config.yaml") as config_file:
+        with open(config_path) as config_file:
             custom = yaml.safe_load(config_file)
     except Exception:
         print "Failed to load configuration"
-    configuration = _update(default, custom)
+    if custom is not None:
+        configuration = _update(configuration, custom)
     _compile_regex(configuration)
     return configuration
 
