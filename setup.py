@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='roots',
       version='1.0.0',
@@ -10,4 +10,8 @@ setup(name='roots',
       url='https://github.com/TomRegan/roots',
       license="http://www.apache.org/licenses/LICENSE-2.0",
       packages=['roots', 'roots.tests'],
+      entry_points={
+          'console_scripts': [
+              'root = roots.root:main',
+          ]}
      )
