@@ -275,6 +275,10 @@ def _configuration(default=False, display=False):
             },
             'overwrite': False,
             'hash': False
+        },
+        'system': {
+            'configfile': '(Default configuration)',
+            'configpath': '(Default configuration)'
         }
     }
     if default:
@@ -284,16 +288,16 @@ def _configuration(default=False, display=False):
     config_path = ''
     for config_path in [default_config_path, '_config.yaml']:
         if path.exists(config_path):
+            configuration['system'] = {
+                'configfile': path.abspath(config_path),
+                'configpath': path.dirname(path.abspath(config_path))
+            }
             break
-    configuration['system'] = {
-        'configfile': path.abspath(config_path),
-        'configpath': path.dirname(path.abspath(config_path))
-    }
     try:
         with open(config_path) as config_file:
             custom = yaml.safe_load(config_file)
     except Exception:
-        print "Failed to load configuration"
+        pass
     if custom is not None:
         configuration = _update(configuration, custom)
     if not display:
