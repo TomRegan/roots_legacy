@@ -17,7 +17,7 @@
 Usage:
   root import <path>
   root update
-  root list [-a] <query>...
+  root list [-a] [<query>]...
   root config [-p | -d | --path | --default]
   root (-h | --help | --version)
 
@@ -323,33 +323,42 @@ def _compile_regex(configuration):
 
 
 def do_list(arguments, configuration):
-    """TODO"""
+    """Loads the metadata library and selects entries from it.
+    """
     books = []
-    library = path.join(configuration['system']['configpath'],
-                        configuration['library'])
-    with open(library, 'rb') as library_file:
+    library_path = path.join(configuration['system']['configpath'],
+                             configuration['library'])
+    with open(library_path, 'rb') as library_file:
         books = pickle.load(library_file)
-    query = arguments['<query>'][0].split(':')
-    if len(query) > 1:
-        restrict = query.pop(0)
-        select = ' '.join(query + arguments['<query>'][1:])
+    restrict, select = _parse_query(arguments)
+    if select is None:
+        results = [(book['author'], book['title']) for book in books]
     else:
-        restrict = 'title'
-        select = ' '.join(arguments['<query>'])
-    results = [
-        (book['author'], book['title'])
-        for book in books
-        if restrict in book.keys()
-        and select.upper() in unicode(book[restrict]).upper()
-    ]
+        results = [(book['author'], book['title'])
+                   for book in books
+                   if restrict in book.keys()
+                   and select.upper() in unicode(book[restrict]).upper()]
     if len(results) == 0:
         configuration['terminal'].warn('No matches for %s.', select)
     elif arguments['-a']:
-        for author in {result[0] for result in results}:
+        for author in sorted({result[0] for result in results}):
             print author
     else:
-        for result in results:
-            print "%s: %s" % result
+        for result in sorted(results):
+            print "%s - %s" % result
+
+
+def _parse_query(arguments):
+    """Extract select and restrict operations from the query.
+    """
+    query = arguments['<query>']
+    if query:
+        if ':' in query[0]:
+            restrict, select = query[0].split(':')
+            return restrict, ' '.join([select] + query[1:])
+        else:
+            return 'title', ' '.join(query)
+    return None, None
 
 
 def main():
