@@ -80,3 +80,6 @@ flycheck_*
 
 # elpa packages
 /elpa/
+
+# mkdocs
+site/
