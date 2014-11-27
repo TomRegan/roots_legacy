@@ -250,11 +250,10 @@ def do_config(arguments, configuration):
     if arguments['-p'] or arguments['--path']:
         print configuration['system']['configfile']
     elif arguments['-d'] or arguments['--default']:
-        print yaml.dump(_configuration(default=True), default_flow_style=False)
+        print yaml.dump(_configuration(default=True, display=True),
+                        default_flow_style=False)
     else:
-        display_configuration = _configuration(display=True)
-        display_configuration.pop('system')
-        print yaml.dump(display_configuration, default_flow_style=False)
+        print yaml.dump(_configuration(display=True), default_flow_style=False)
 
 
 def _configuration(default=False, display=False):
@@ -300,7 +299,9 @@ def _configuration(default=False, display=False):
         pass
     if custom is not None:
         configuration = _update(configuration, custom)
-    if not display:
+    if display:
+        configuration.pop('system')
+    else:
         _compile_regex(configuration)
     return configuration
 

@@ -12,6 +12,6 @@ setup(name='roots',
       packages=['roots', 'roots.tests'],
       entry_points={
           'console_scripts': [
-              'root = roots.root:main',
+              'root = roots.roots:main',
           ]}
      )
