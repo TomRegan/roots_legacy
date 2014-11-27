@@ -16,8 +16,8 @@
 """
 Usage:
   root import <path>
-  root reimport
-  root list <query>...
+  root update
+  root list [-a] <query>...
   root config [-p | -d | --path | --default]
   root (-h | --help | --version)
 
@@ -80,11 +80,10 @@ def do_command(arguments, configuration):
         if path.isfile(srcpath):
             term.warn("source path should not be a file: %s", srcpath)
             return
-        configuration['srcpath'] = srcpath
+        configuration['system']['srcpath'] = srcpath
         do_import(configuration)
-    elif arguments['reimport']:
-        configuration['srcpath'] = configuration['directory']
-        do_reimport(configuration)
+    elif arguments['update']:
+        do_update(configuration)
     elif arguments['config']:
         do_config(arguments, configuration)
     elif arguments['list']:
@@ -95,7 +94,7 @@ def do_import(configuration):
     """TODO"""
     moves = _consider_moves(configuration)
     count = _move_to_library(moves, configuration)
-    print "Imported %s" % count, count is not 1 and "books" or "book"
+    print "Imported %s" % count, count is not 1 and "books." or "book."
 
 
 def _consider_moves(configuration):
@@ -103,7 +102,7 @@ def _consider_moves(configuration):
     """
     library = configuration['directory']
     moves = []
-    for basepath, _, filenames in walk(configuration['srcpath']):
+    for basepath, _, filenames in walk(configuration['system']['srcpath']):
         for filename in filenames:
             if not filename.endswith(".epub"):
                 continue
@@ -226,19 +225,23 @@ def _move_to_library(moves, configuration, move=_copy):
     return count
 
 
-def do_reimport(configuration):
+def do_update(configuration):
     """TODO"""
     books = []
-    for basepath, _, filenames in walk(configuration['srcpath']):
+    directory = configuration['directory']
+    if not path.exists(directory):
+        configuration['terminal'].warn('Cannot open library: %s', directory)
+        return
+    for basepath, _, filenames in walk(directory):
         for filename in filenames:
-            if not filename.endswith(".epub"):
-                continue
-            srcpath = join(basepath, filename)
-            books.append(_load_book_data(srcpath, configuration))
+            if filename.endswith(".epub"):
+                srcpath = join(basepath, filename)
+                books.append(_load_book_data(srcpath, configuration))
     library = path.join(configuration['system']['configpath'],
                         configuration['library'])
     with open(library, 'wb') as library_file:
         pickle.dump(books, library_file)
+    print 'Imported %d %s.' % (len(books), len(books) != 1 and 'books' or 'book')
 
 
 def do_config(arguments, configuration):
@@ -341,6 +344,9 @@ def do_list(arguments, configuration):
     ]
     if len(results) == 0:
         configuration['terminal'].warn('No matches for %s.', select)
+    elif arguments['-a']:
+        for author in {result[0] for result in results}:
+            print author
     else:
         for result in results:
             print "%s: %s" % result
