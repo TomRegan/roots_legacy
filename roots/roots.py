@@ -19,17 +19,19 @@ Usage:
   root update
   root list [-a | -i] [<query>]...
   root config [-p | -d | --path | --default]
+  root help <command>
   root (-h | --help | --version)
 
 Commands:
-  import       Import new e-books.
-  update       Update the library.
-  list         Query the library.
-  config       Show the configuration.
+  import     Import new e-books.
+  update     Update the library.
+  list       Query the library.
+  config     Show the configuration.
+  help       Show help for a sub-command.
 
 Options:
-  -h --help    Show this help.
-  --version    Show version.
+  -h --help  Show this help.
+  --version  Show version.
 """
 
 import zipfile
@@ -46,6 +48,8 @@ from docopt import docopt
 from urlparse import urljoin
 from urllib import pathname2url as to_url
 from hashlib import sha1
+
+from command import List, Help
 
 
 class Terminal(blessings.Terminal):
@@ -93,7 +97,9 @@ def do_command(arguments, configuration):
     elif arguments['config']:
         do_config(arguments, configuration)
     elif arguments['list']:
-        do_list(arguments, configuration)
+        List(arguments, configuration).do
+    elif arguments['help']:
+        Help(arguments, configuration).do
 
 
 def do_import(configuration):
@@ -331,49 +337,6 @@ def _compile_regex(configuration):
     configuration['import']['replacements'] = {
         re.compile(k): v for k, v in replacements.iteritems()
     }
-
-
-def do_list(arguments, configuration):
-    """Loads the library metadata and selects entries from it.
-    """
-    books = []
-    library_path = path.join(configuration['system']['configpath'],
-                             configuration['library'])
-    with open(library_path, 'rb') as library_file:
-        books = pickle.load(library_file)
-    restrict, select = _parse_query(arguments)
-    if select is None:
-        results = [(book['author'], book['title'], book['isbn'])
-                   for book in books]
-    else:
-        results = [(book['author'], book['title'], book['isbn'])
-                   for book in books
-                   if restrict in book.keys()
-                   and select.upper() in unicode(book[restrict]).upper()]
-    if len(results) == 0:
-        configuration['terminal'].warn('No matches for %s.', select)
-    elif arguments['-a']:
-        for author in sorted({result[0] for result in results}):
-            print author
-    elif arguments['-i']:
-        for result in sorted(results):
-            print "%s - %s - %s" % result
-    else:
-        for result in sorted(results):
-            print "%s - %s" % result[:2]
-
-
-def _parse_query(arguments):
-    """Extract select and restrict operations from the query.
-    """
-    query = arguments['<query>']
-    if query:
-        if ':' in query[0]:
-            restrict, select = query[0].split(':')
-            return restrict, ' '.join([select] + query[1:])
-        else:
-            return 'title', ' '.join(query)
-    return None, None
 
 
 def main():
