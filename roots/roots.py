@@ -21,6 +21,12 @@ Usage:
   root config [-p | -d | --path | --default]
   root (-h | --help | --version)
 
+Commands:
+  import       Import new e-books.
+  update       Update the library.
+  list         Query the library.
+  config       Show the configuration.
+
 Options:
   -h --help    Show this help.
   --version    Show version.
