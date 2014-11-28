@@ -165,27 +165,26 @@ def _load_ops_data(xml_data, configuration):
     """Constructs a dictionary from OPS XML data.
     """
     search = configuration['search']
-    title = search(xml_data, "title") or ""
-    author = search(xml_data, "creator") or ""
-    isbn = search(xml_data, "identifier") or ""
     return {
-        "title": title,
-        "author": _author(author),
-        "isbn": _isbn(isbn)
+        "title": search(xml_data, "title") or "",
+        "author": _author(search(xml_data, "creator") or ""),
+        "isbn": _isbn(search(xml_data, "identifier") or "")
     }
 
 
 def _isbn(number, old_length=0):
     """Return an ISBN given a (possibly malformed) string.
     """
-    length = len(number)
-    if length == 0:
-        return None
-    if length == old_length:
-        return int(number)
-    if number.isdigit() and (length == 13 or length == 10):
-        return int(number)
-    return _isbn(''.join([x for x in number if x.isdigit()]), length)
+    number = number.replace('-', '')
+    expr = (r'^[^\d]*('
+            r'(97[8|9])?'  # ean
+            r'\d{2}'       # group
+            r'\d{4}'       # registrant
+            r'\d{3}'       # publication
+            r'[\d|xX]'     # check
+            r')[^\d]*$')
+    matches = re.search(expr, number)
+    return matches is not None and matches.group(1) or None
 
 
 def _author(string):
