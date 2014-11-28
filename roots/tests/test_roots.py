@@ -17,19 +17,19 @@
 
 import unittest
 
-import root
+from roots import roots
 
 class TestStringManipulation(unittest.TestCase):
     """Tests
     """
     def test_author_normalisation(self):
-        self.assertEqual("Foo Bar", root._author("Bar, Foo"))
-        self.assertEqual("Eggs Spam", root._author("Spam, Eggs"))
+        self.assertEqual("Foo Bar", roots._author("Bar, Foo"))
+        self.assertEqual("Eggs Spam", roots._author("Spam, Eggs"))
 
 
     def test_path_normalisation(self):
-        c = root._configuration()  # test defaults
-        [self.assertEqual(e, root._clean_path(a, c)) for e, a in
+        c = roots._configuration()  # test defaults
+        [self.assertEqual(e, roots._clean_path(a, c)) for e, a in
          [
              ("Space_ The Final Frontier", "Space: The Final Frontier"),
              ("Spaces, The Final Frontier", "Spaces, The Final Frontier   "),
