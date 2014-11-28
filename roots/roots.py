@@ -17,7 +17,7 @@
 Usage:
   root import <path>
   root update
-  root list [-a] [<query>]...
+  root list [-a | -i] [<query>]...
   root config [-p | -d | --path | --default]
   root (-h | --help | --version)
 
@@ -100,7 +100,7 @@ def do_import(configuration):
     """TODO"""
     moves = _consider_moves(configuration)
     count = _move_to_library(moves, configuration)
-    print "Imported %s" % count, count is not 1 and "books." or "book."
+    print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
 
 def _consider_moves(configuration):
@@ -246,7 +246,8 @@ def do_update(configuration):
                         configuration['library'])
     with open(library, 'wb') as library_file:
         pickle.dump(books, library_file)
-    print 'Imported %d %s.' % (len(books), len(books) != 1 and 'books' or 'book')
+    count = len(books)
+    print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
 
 def do_config(arguments, configuration):
@@ -333,7 +334,7 @@ def _compile_regex(configuration):
 
 
 def do_list(arguments, configuration):
-    """Loads the metadata library and selects entries from it.
+    """Loads the library metadata and selects entries from it.
     """
     books = []
     library_path = path.join(configuration['system']['configpath'],
@@ -342,9 +343,10 @@ def do_list(arguments, configuration):
         books = pickle.load(library_file)
     restrict, select = _parse_query(arguments)
     if select is None:
-        results = [(book['author'], book['title']) for book in books]
+        results = [(book['author'], book['title'], book['isbn'])
+                   for book in books]
     else:
-        results = [(book['author'], book['title'])
+        results = [(book['author'], book['title'], book['isbn'])
                    for book in books
                    if restrict in book.keys()
                    and select.upper() in unicode(book[restrict]).upper()]
@@ -353,9 +355,12 @@ def do_list(arguments, configuration):
     elif arguments['-a']:
         for author in sorted({result[0] for result in results}):
             print author
+    elif arguments['-i']:
+        for result in sorted(results):
+            print "%s - %s - %s" % result
     else:
         for result in sorted(results):
-            print "%s - %s" % result
+            print "%s - %s" % result[:2]
 
 
 def _parse_query(arguments):
