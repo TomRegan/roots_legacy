@@ -77,7 +77,7 @@ Examples:
                            and select.upper()
                            in unicode(book[restrict]).upper()]
         if len(results) == 0:
-            configuration['terminal'].warn('No matches for %s.', select)
+            self._configuration['terminal'].warn('No matches for %s.', select)
         elif self._arguments['-a']:
             for author in sorted({result[0] for result in results}):
                 print author

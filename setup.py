@@ -9,7 +9,7 @@ setup(name='roots',
       author_email='code.tom.regan@gmail.com',
       url='https://github.com/TomRegan/roots',
       license="http://www.apache.org/licenses/LICENSE-2.0",
-      packages=['roots', 'roots.tests'],
+      packages=['roots', 'roots.tests', 'roots.command'],
       entry_points={
           'console_scripts': [
               'root = roots.roots:main',
