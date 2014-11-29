@@ -104,6 +104,10 @@ def do_command(arguments, configuration):
 
 def do_import(configuration):
     """TODO"""
+    directory = configuration['directory']
+    if not path.exists(directory):
+        configuration['terminal'].warn('Cannot open library: %s', directory)
+        return
     moves = _consider_moves(configuration)
     count = _move_to_library(moves, configuration)
     print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
