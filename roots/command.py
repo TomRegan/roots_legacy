@@ -15,10 +15,11 @@
 #   limitations under the License.
 """Commands.
 """
-from os.path import join, isfile, exists
-from os import walk
+from os.path import join, isfile, exists, basename
+from os import walk, makedirs
 from sys import modules
 from inspect import isclass, getmembers
+from shutil import copy2 as _copy
 
 import pickle
 import yaml
@@ -27,10 +28,27 @@ from configuration import user_configuration, default_configuration
 from format import EpubFormat
 
 
-class _Command(object):
+def command(arguments, configuration):
+    """Returns an appropriate command.
+    """
+    if arguments['import']:
+        return Import(arguments, configuration)
+    elif arguments['update']:
+        return Update(arguments, configuration)
+    elif arguments['config']:
+        return Config(arguments, configuration)
+    elif arguments['list']:
+        return List(arguments, configuration)
+    elif arguments['help']:
+        return Help(arguments, configuration)
+    elif arguments['fields']:
+        return Fields(arguments, configuration)
+
+
+class BaseCommand(object):
 
     """Base command class.
-    """
+"""
     @property
     def name(self):
         return self.__class__.__name__
@@ -40,7 +58,7 @@ class _Command(object):
         return self.__doc__
 
 
-class List(_Command):
+class List(BaseCommand):
 
     """Usage: root list [-a | -i] [<query>]...
 Synopsis: Queries the library.
@@ -113,7 +131,7 @@ Examples:
                 print "%s - %s" % result[:2]
 
 
-class Fields(_Command):
+class Fields(BaseCommand):
 
     """Usage: root fields
 Synopsis: Shows fields that can be used in queries.
@@ -141,7 +159,7 @@ Synopsis: Shows fields that can be used in queries.
             print '\n'.join(fields)
 
 
-class Help(_Command):
+class Help(BaseCommand):
 
     """Usage: root help [%s]
 Synopsis: Shows help for a command.
@@ -156,7 +174,8 @@ Examples:
         self._configuration = configuration
         self._commands = {n.lower(): c
                           for n, c in getmembers(modules[__name__], isclass)
-                          if n is not self.name and '_' not in n[0]}
+                          if n is not self.name
+                          and n not in ['BaseCommand', 'EpubFormat']}
 
     @property
     def do(self):
@@ -177,7 +196,7 @@ Examples:
         return self.__doc__ % ' | '.join(self._commands.keys())
 
 
-class Config(_Command):
+class Config(BaseCommand):
 
     """Usage: root config [-p | --path | -d | --default]
 Synopsis: Shows the configuration.
@@ -206,7 +225,7 @@ Options:
         print yaml.dump(configuration, default_flow_style=False)
 
 
-class Update(_Command):
+class Update(BaseCommand):
 
     """Usage: root update
 Synopsis: Updates the library.
@@ -237,3 +256,90 @@ Synopsis: Updates the library.
             pickle.dump(books, library_file)
             count = len(books)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
+
+
+class Import(BaseCommand):
+
+    """Usage: root import <path>
+Synopsis: Imports new e-books.
+
+Examples:
+  root import ~/Downloads/
+    -> imports books from ~/Downloads/
+"""
+
+    def __init__(self, arguments, configuration):
+        self._arguments = arguments
+        self._configuration = configuration
+
+    @property
+    def do(self):
+        """Imports new e-books.
+        """
+        term = self._configuration['terminal']
+        srcpath = self._arguments['<path>']
+        if isfile(srcpath):
+            term.warn("source path should not be a file: %s", srcpath)
+            return
+        directory = self._configuration['directory']
+        if not exists(directory):
+            term.warn('Cannot open library: %s', directory)
+            return
+        moves = self._consider_moves()
+        count = self._move_to_library(moves)
+        print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
+
+    def _consider_moves(self):
+        """Determines the files to be moved and their destinations.
+        """
+        library = self._configuration['directory']
+        moves = []
+        for basepath, _, filenames in walk(self._arguments['<path>']):
+            for filename in filenames:
+                if not filename.endswith(".epub"):
+                    continue
+                srcpath = join(basepath, filename)
+                book = EpubFormat(self._configuration).load(srcpath)
+                if book is None:
+                    continue
+                destination_dir = join(library, book['author'])
+                destination_file = self._clean_path(
+                    book['title'] + '.epub')
+                destpath = join(destination_dir, destination_file)
+                moves.append((srcpath, destpath, destination_dir))
+        return moves
+
+    def _clean_path(self, srcpath):
+        """Takes a path (as a Unicode string) and makes sure that it is
+        legal.
+        """
+        replacements = self._configuration['import']['replacements']
+        for expression, replacement in replacements.iteritems():
+            srcpath = expression.sub(replacement, srcpath)
+        return srcpath
+
+    def _move_to_library(self, moves, move=_copy):
+        """Move files to the library
+        """
+        terminal = self._configuration['terminal']
+        count = 0
+        for srcpath, destpath, destination_dir in moves:
+            try:
+                if not exists(destination_dir):
+                    makedirs(destination_dir)
+            except OSError:
+                terminal.warn("Error creating path %s", destination_dir)
+                continue
+            overwrite = self._configuration['import']['overwrite']
+            if not overwrite and isfile(destpath):
+                terminal.warn("Not importing %s because it already exists "
+                              "in the library.", srcpath)
+                continue
+            print "%s ->\n%s" % (basename(srcpath), destpath)
+            try:
+                move(srcpath, destpath)
+                count += 1
+            except IOError, ioerror:
+                terminal.warn("Error copying %s (%s)", srcpath, ioerror.errno)
+                continue
+        return count

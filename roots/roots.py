@@ -35,18 +35,11 @@ Options:
   -h --help  Show this help.
   --version  Show version.
 """
-
-
-import re
 import blessings
-import pickle
 
-from os import path, walk, makedirs
-from os.path import join
-from shutil import copy2 as _copy
 from docopt import docopt
 
-from command import List, Help, Config, Fields, Update
+from command import command
 from configuration import user_configuration, compile_regex
 from format import EpubFormat
 
@@ -80,101 +73,15 @@ def do_command(arguments, configuration):
         if elements is None or len(elements) < 1:
             return
         return elements[0].text or elements[0]
-
     configuration['search'] = locate_element
-    term = Terminal()
-    configuration['terminal'] = term
-    if arguments['import']:
-        srcpath = arguments['<path>']
-        if path.isfile(srcpath):
-            term.warn("source path should not be a file: %s", srcpath)
-            return
-        configuration['system']['srcpath'] = srcpath
-        do_import(configuration)
-    elif arguments['update']:
-        Update(arguments, configuration).do
-    elif arguments['config']:
-        Config(arguments, configuration).do
-    elif arguments['list']:
-        List(arguments, configuration).do
-    elif arguments['help']:
-        Help(arguments, configuration).do
-    elif arguments['fields']:
-        Fields(arguments, configuration).do
-
-
-def do_import(configuration):
-    """TODO"""
-    directory = configuration['directory']
-    if not path.exists(directory):
-        configuration['terminal'].warn('Cannot open library: %s', directory)
-        return
-    moves = _consider_moves(configuration)
-    count = _move_to_library(moves, configuration)
-    print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
-
-
-def _consider_moves(configuration):
-    """Determines the files to be moved and their destinations.
-    """
-    library = configuration['directory']
-    moves = []
-    for basepath, _, filenames in walk(configuration['system']['srcpath']):
-        for filename in filenames:
-            if not filename.endswith(".epub"):
-                continue
-            srcpath = join(basepath, filename)
-            #book = _load_book_data(srcpath, configuration)
-            book = EpubFormat(configuration).load(srcpath)
-            if book is None:
-                continue
-            destination_dir = path.join(library, book['author'])
-            destination_file = _clean_path(
-                book['title'] + '.epub', configuration)
-            destpath = path.join(destination_dir, destination_file)
-            moves.append((srcpath, destpath, destination_dir))
-    return moves
-
-
-def _clean_path(srcpath, configuration):
-    """Takes a path (as a Unicode string) and makes sure that it is
-    legal.
-    """
-    replacements = configuration['import']['replacements']
-    for expression, replacement in replacements.iteritems():
-        srcpath = expression.sub(replacement, srcpath)
-    return srcpath
-
-
-def _move_to_library(moves, configuration, move=_copy):
-    """Move files to the library
-    """
-    terminal = configuration['terminal']
-    count = 0
-    for srcpath, destpath, destination_dir in moves:
-        try:
-            if not path.exists(destination_dir):
-                makedirs(destination_dir)
-        except OSError:
-            terminal.warn("Error creating path %s", destination_dir)
-            continue
-        if not configuration['import']['overwrite'] and path.isfile(destpath):
-            terminal.warn("Not importing %s because it already exists in the "
-                          "library.", srcpath)
-            continue
-        print "%s ->\n%s" % (path.basename(srcpath), destpath)
-        try:
-            move(srcpath, destpath)
-            count += 1
-        except IOError, ioerror:
-            terminal.warn("Error copying %s (%s)", srcpath, ioerror.errno)
-            continue
-    return count
+    configuration['terminal'] = Terminal()
+    cmd = command(arguments, configuration)
+    cmd.do
 
 
 def main():
     """TODO"""
-    arguments = docopt(__doc__, version='0.0.1')
+    arguments = docopt(__doc__, version='1.0.0')
     configuration = user_configuration()
     compile_regex(configuration)
     do_command(arguments, configuration)
