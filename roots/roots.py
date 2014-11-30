@@ -18,6 +18,7 @@ Usage:
   root import <path>
   root update
   root list [-a | -i] [<query>]...
+  root fields
   root config [-p | -d | --path | --default]
   root help <command>
   root (-h | --help | --version)
@@ -26,6 +27,7 @@ Commands:
   import     Import new e-books.
   update     Update the library.
   list       Query the library.
+  fields     Show fields that can be used in queries.
   config     Show the configuration.
   help       Show help for a sub-command.
 
@@ -42,14 +44,15 @@ import blessings
 import pickle
 
 from os import path, walk, makedirs
-from os.path import join, expanduser
+from os.path import join
 from shutil import copy2 as _copy
 from docopt import docopt
 from urlparse import urljoin
 from urllib import pathname2url as to_url
 from hashlib import sha1
 
-from command import List, Help
+from command import List, Help, Config, Fields
+from configuration import user_configuration
 
 
 class Terminal(blessings.Terminal):
@@ -95,11 +98,13 @@ def do_command(arguments, configuration):
     elif arguments['update']:
         do_update(configuration)
     elif arguments['config']:
-        do_config(arguments, configuration)
+        Config(arguments, configuration).do
     elif arguments['list']:
         List(arguments, configuration).do
     elif arguments['help']:
         Help(arguments, configuration).do
+    elif arguments['fields']:
+        Fields(arguments, configuration).do
 
 
 def do_import(configuration):
@@ -187,7 +192,7 @@ def _isbn(number, old_length=0):
     """
     number = number.replace('-', '')
     expr = (r'^[^\d]*('
-            r'(97[8|9])?'  # ean
+            r'(97[8|9])?'  # ean, excluded if ISBN-10
             r'\d{2}'       # group
             r'\d{4}'       # registrant
             r'\d{3}'       # publication
@@ -260,80 +265,6 @@ def do_update(configuration):
     print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
 
-def do_config(arguments, configuration):
-    """Prints configuration.
-    """
-    if arguments['-p'] or arguments['--path']:
-        print configuration['system']['configfile']
-    elif arguments['-d'] or arguments['--default']:
-        print yaml.dump(_configuration(default=True, display=True),
-                        default_flow_style=False)
-    else:
-        print yaml.dump(_configuration(display=True), default_flow_style=False)
-
-
-def _configuration(default=False, display=False):
-    """Loads YAML configuration.
-    """
-    custom = {}
-    configuration = {
-        'library': 'library.db',
-        'directory': '~/Books',
-        'import': {
-            'replacements': {
-                r'[\\/]': '_',
-                r'^\.': '_',
-                r'[\x00-\x1f]': '',
-                r'[<>:"\?\*\|]': '_',
-                r'\.$': '_',
-                r'\s+$': ''
-            },
-            'overwrite': False,
-            'hash': False
-        },
-        'system': {
-            'configfile': '(Default configuration)',
-            'configpath': '(Default configuration)'
-        }
-    }
-    if default:
-        return configuration
-    default_config_path = path.join(
-        path.expanduser('~'), '.config/roots/config.yaml')
-    config_path = ''
-    for config_path in [default_config_path, '_config.yaml']:
-        if path.exists(config_path):
-            configuration['system'] = {
-                'configfile': path.abspath(config_path),
-                'configpath': path.dirname(path.abspath(config_path))
-            }
-            break
-    try:
-        with open(config_path) as config_file:
-            custom = yaml.safe_load(config_file)
-    except Exception:
-        pass
-    if custom is not None:
-        configuration = _update(configuration, custom)
-    if display:
-        configuration.pop('system')
-    else:
-        _compile_regex(configuration)
-    return configuration
-
-
-def _update(defaults, updates):
-    """Updates a nested dictionary
-    """
-    for k, v in updates.iteritems():
-        if type(v) is dict:
-            replacement = _update(defaults.get(k, {}), v)
-            defaults[k] = replacement
-        else:
-            defaults[k] = updates[k]
-    return defaults
-
-
 def _compile_regex(configuration):
     """Compiles regexes in the configuration
     """
@@ -346,7 +277,7 @@ def _compile_regex(configuration):
 def main():
     """TODO"""
     arguments = docopt(__doc__, version='0.0.1')
-    configuration = _configuration()
+    configuration = user_configuration()
     do_command(arguments, configuration)
 
 
