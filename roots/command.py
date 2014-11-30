@@ -15,7 +15,8 @@
 #   limitations under the License.
 """Commands.
 """
-from os.path import join, isfile
+from os.path import join, isfile, exists
+from os import walk
 from sys import modules
 from inspect import isclass, getmembers
 
@@ -23,6 +24,7 @@ import pickle
 import yaml
 
 from configuration import user_configuration, default_configuration
+from format import EpubFormat
 
 
 class _Command(object):
@@ -112,9 +114,11 @@ Examples:
 
 
 class Fields(_Command):
+
     """Usage: root fields
 Synopsis: Shows fields that can be used in queries.
 """
+
     def __init__(self, arguments, configuration):
         self._arguments = arguments
         self._configuration = configuration
@@ -200,3 +204,36 @@ Options:
             configuration = user_configuration()
         configuration.pop('system')
         print yaml.dump(configuration, default_flow_style=False)
+
+
+class Update(_Command):
+
+    """Usage: root update
+Synopsis: Updates the library.
+"""
+
+    def __init__(self, arguments, configuration):
+        self._arguments = arguments
+        self._configuration = configuration
+
+    @property
+    def do(self):
+        """Updates the library.
+        """
+        books = []
+        directory = self._configuration['directory']
+        term = self._configuration['terminal']
+        if not exists(directory):
+            term.warn('Cannot open library: %s', directory)
+            return
+        for basepath, _, filenames in walk(directory):
+            for filename in filenames:
+                if filename.endswith(".epub"):
+                    srcpath = join(basepath, filename)
+                    books.append(EpubFormat(self._configuration).load(srcpath))
+        library = join(self._configuration['system']['configpath'],
+                       self._configuration['library'])
+        with open(library, 'wb') as library_file:
+            pickle.dump(books, library_file)
+            count = len(books)
+        print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')

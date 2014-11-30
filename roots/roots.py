@@ -36,9 +36,7 @@ Options:
   --version  Show version.
 """
 
-import zipfile
-import xml.etree.ElementTree as ET
-import yaml
+
 import re
 import blessings
 import pickle
@@ -47,12 +45,10 @@ from os import path, walk, makedirs
 from os.path import join
 from shutil import copy2 as _copy
 from docopt import docopt
-from urlparse import urljoin
-from urllib import pathname2url as to_url
-from hashlib import sha1
 
-from command import List, Help, Config, Fields
-from configuration import user_configuration
+from command import List, Help, Config, Fields, Update
+from configuration import user_configuration, compile_regex
+from format import EpubFormat
 
 
 class Terminal(blessings.Terminal):
@@ -96,7 +92,7 @@ def do_command(arguments, configuration):
         configuration['system']['srcpath'] = srcpath
         do_import(configuration)
     elif arguments['update']:
-        do_update(configuration)
+        Update(arguments, configuration).do
     elif arguments['config']:
         Config(arguments, configuration).do
     elif arguments['list']:
@@ -128,7 +124,8 @@ def _consider_moves(configuration):
             if not filename.endswith(".epub"):
                 continue
             srcpath = join(basepath, filename)
-            book = _load_book_data(srcpath, configuration)
+            #book = _load_book_data(srcpath, configuration)
+            book = EpubFormat(configuration).load(srcpath)
             if book is None:
                 continue
             destination_dir = path.join(library, book['author'])
@@ -137,76 +134,6 @@ def _consider_moves(configuration):
             destpath = path.join(destination_dir, destination_file)
             moves.append((srcpath, destpath, destination_dir))
     return moves
-
-
-def _load_book_data(srcpath, configuration):
-    """Reads the metadata from an ebook file.
-    """
-    content_xml = _load_metadata(srcpath, configuration)
-    if content_xml is not None:
-        book = _load_ops_data(content_xml, configuration)
-        if configuration['import']['hash']:
-            with open(srcpath, 'rb') as zipfile:
-                book['sha_hash'] = sha1(zipfile.read()).hexdigest()
-        book['url_path'] = urljoin('file:', to_url(srcpath))
-        return book
-
-
-def _load_metadata(epub_filename, configuration):
-    """Reads an epub file and returns its OPS / OEBPS blob.
-    """
-    search = configuration['search']
-    term = configuration['terminal']
-    if not zipfile.is_zipfile(epub_filename):
-        term.warn("Not importing %s because it is not a .epub file.",
-                  epub_filename.replace("./", ""))
-        return
-    with zipfile.ZipFile(epub_filename, 'r') as epub_file:
-        meta_data = None
-        try:
-            meta_data = epub_file.read("META-INF/container.xml")
-        except Exception:
-            term.warn("Could not locate a container file in %s", epub_filename)
-            return
-        meta_xml = ET.fromstring(meta_data)
-        full_path = search(meta_xml, "rootfile")
-        if full_path is None:
-            term.warn("Could not locate a metadata file in %s", epub_filename)
-            return
-        return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
-
-
-def _load_ops_data(xml_data, configuration):
-    """Constructs a dictionary from OPS XML data.
-    """
-    search = configuration['search']
-    return {
-        "title": search(xml_data, "title") or "",
-        "author": _author(search(xml_data, "creator") or ""),
-        "isbn": _isbn(search(xml_data, "identifier") or "")
-    }
-
-
-def _isbn(number, old_length=0):
-    """Return an ISBN given a (possibly malformed) string.
-    """
-    number = number.replace('-', '')
-    expr = (r'^[^\d]*('
-            r'(97[8|9])?'  # ean, excluded if ISBN-10
-            r'\d{2}'       # group
-            r'\d{4}'       # registrant
-            r'\d{3}'       # publication
-            r'[\d|xX]'     # check
-            r')[^\d]*$')
-    matches = re.search(expr, number)
-    return matches is not None and matches.group(1) or None
-
-
-def _author(string):
-    """Return the normalised author name.
-    """
-    name = string.split(',')
-    return len(name) == 1 and string or ' '.join([name[1], name[0]]).strip()
 
 
 def _clean_path(srcpath, configuration):
@@ -245,39 +172,11 @@ def _move_to_library(moves, configuration, move=_copy):
     return count
 
 
-def do_update(configuration):
-    """TODO"""
-    books = []
-    directory = configuration['directory']
-    if not path.exists(directory):
-        configuration['terminal'].warn('Cannot open library: %s', directory)
-        return
-    for basepath, _, filenames in walk(directory):
-        for filename in filenames:
-            if filename.endswith(".epub"):
-                srcpath = join(basepath, filename)
-                books.append(_load_book_data(srcpath, configuration))
-    library = path.join(configuration['system']['configpath'],
-                        configuration['library'])
-    with open(library, 'wb') as library_file:
-        pickle.dump(books, library_file)
-    count = len(books)
-    print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
-
-
-def _compile_regex(configuration):
-    """Compiles regexes in the configuration
-    """
-    replacements = configuration['import']['replacements']
-    configuration['import']['replacements'] = {
-        re.compile(k): v for k, v in replacements.iteritems()
-    }
-
-
 def main():
     """TODO"""
     arguments = docopt(__doc__, version='0.0.1')
     configuration = user_configuration()
+    compile_regex(configuration)
     do_command(arguments, configuration)
 
 

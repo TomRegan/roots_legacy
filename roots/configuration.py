@@ -18,6 +18,7 @@
 
 from os import path
 import yaml
+import re
 
 
 def default_configuration():
