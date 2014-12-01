@@ -48,7 +48,7 @@ def command(arguments, configuration):
 class BaseCommand(object):
 
     """Base command class.
-"""
+    """
     @property
     def name(self):
         return self.__class__.__name__

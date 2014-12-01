@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #   Copyright 2014 Tom Regan
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,38 +13,25 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-"""Unit Tests.
+"""Format unit tests.
 """
 
 import unittest
 
-from roots import roots
+from roots.format import BaseFormat
 
-class TestStringManipulation(unittest.TestCase):
-    """Tests
-    """
+
+class FormatTest(unittest.TestCase):
+
     def test_author_normalisation(self):
-        self.assertEqual("Foo Bar", roots._author("Bar, Foo"))
-        self.assertEqual("Eggs Spam", roots._author("Spam, Eggs"))
-
-
-    def test_path_normalisation(self):
-        c = roots._configuration()  # test defaults
-        [self.assertEqual(roots._clean_path(i, c), e) for e, i in
-         [
-             ("Space_ The Final Frontier", "Space: The Final Frontier"),
-             ("Spaces, The Final Frontier", "Spaces, The Final Frontier   "),
-             ("_invisible", ".invisible"),
-             ("visible_", "visible."),
-             ("windows___nix_", "windows<>*nix?"),
-             ("put _that_ in your _", "put _that_ in your |"),
-             ("valid.epub", "valid.epub")
-         ]
-        ]
+        cls = BaseFormat()
+        self.assertEqual("Foo Bar", cls._author("Bar, Foo"))
+        self.assertEqual("Eggs Spam", cls._author("Spam, Eggs"))
 
 
     def test_isbn_determination(self):
-        [self.assertEqual(roots._isbn(i), e) for e, i in
+        cls = BaseFormat()
+        [self.assertEqual(cls._isbn(i), e) for e, i in
          [
              ("9783456789123", "9783456789123"),
              ("9793456789123", "9793456789123"),
