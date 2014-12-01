@@ -19,6 +19,7 @@
 import unittest
 
 from roots.format import BaseFormat
+import xml.etree.ElementTree as etree
 
 
 class FormatTest(unittest.TestCase):
@@ -46,6 +47,49 @@ class FormatTest(unittest.TestCase):
          ]
         ]
 
+    def test_xml_search_for_author(self):
+        cls = BaseFormat()
+        element = etree.fromstring(self._opf_helper(
+            '<dc:creator opf:file-as="Brand, Russell" '
+            'opf:role="aut">Russell Brand</dc:creator>'))
+        self.assertEquals("Russell Brand", cls._search(element, 'creator'))
+
+    def test_xml_search_for_title(self):
+        cls = BaseFormat()
+        element = etree.fromstring(self._opf_helper(
+            '<dc:title>Revolution</dc:title>'
+        ))
+        self.assertEquals("Revolution", cls._search(element, 'title'))
+
+    def test_xml_search_for_isbn(self):
+        cls = BaseFormat()
+        element = etree.fromstring(self._opf_helper(
+            '<dc:identifier opf:scheme="ISBN">9781101882924</dc:identifier>'
+            '<dc:identifier opf:scheme="MOBI-ASIN">B00LKJHTJU</dc:identifier>'
+        ))
+        self.assertEquals("9781101882924", cls._search(element, 'identifier'))
+
+    def test_xml_search_for_rootfile(self):
+        cls = BaseFormat()
+        element = etree.fromstring('<?xml version="1.0"?>'
+                                   '<container version="1.0" xmlns="urn:oasis:'
+                                   'names:tc:opendocument:xmlns:container">'
+                                   '<rootfiles>'
+                                   '<rootfile full-path="content.opf" media-'
+                                   'type="application/oebps-package+xml"/>'
+                                   '</rootfiles>'
+                                   '</container>'
+        )
+        self.assertEquals("content.opf",
+                          cls._search(element, 'rootfile').attrib['full-path'])
+
+    def _opf_helper(self, element):
+        return ('<?xml version="1.0" encoding="utf-8"?>'
+                '<metadata '
+                'xmlns:dc="http://purl.org/dc/elements/1.1/" '
+                'xmlns:opf="http://www.idpf.org/2007/opf">'
+                '%s'
+                '</metadata>') % element
 
 if __name__ == '__main__':
     unittest.main()

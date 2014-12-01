@@ -66,14 +66,6 @@ class Terminal(blessings.Terminal):
 
 def do_command(arguments, configuration):
     """TODO"""
-    def locate_element(x, y):
-        if x is None or y is None:
-            return
-        elements = [e for e in x.iter() if e.tag.endswith(y)]
-        if elements is None or len(elements) < 1:
-            return
-        return elements[0].text or elements[0]
-    configuration['search'] = locate_element
     configuration['terminal'] = Terminal()
     cmd = command(arguments, configuration)
     cmd.do

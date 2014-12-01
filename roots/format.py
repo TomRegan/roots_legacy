@@ -52,6 +52,14 @@ class BaseFormat(object):
         matches = re.search(expr, number)
         return matches is not None and matches.group(1) or None
 
+    def _search(self, x, y):
+        if x is None or y is None:
+            return
+        elements = [e for e in x.iter() if e.tag.endswith(y)]
+        if elements is None or len(elements) < 1:
+            return
+        return elements[0].text or elements[0]
+
 
 class EpubFormat(BaseFormat):
 
@@ -73,7 +81,6 @@ class EpubFormat(BaseFormat):
     def _load_metadata(self, epub_filename):
         """Reads an epub file and returns its OPS / OEBPS blob.
         """
-        search = self._configuration['search']
         term = self._configuration['terminal']
         if not zipfile.is_zipfile(epub_filename):
             term.warn("Not importing %s because it is not a .epub file.",
@@ -87,7 +94,7 @@ class EpubFormat(BaseFormat):
                 term.warn("Could not locate a container file in %s", epub_filename)
                 return
             meta_xml = ET.fromstring(meta_data)
-            full_path = search(meta_xml, "rootfile")
+            full_path = self._search(meta_xml, "rootfile")
             if full_path is None:
                 term.warn("Could not locate a metadata file in %s", epub_filename)
                 return
@@ -96,9 +103,8 @@ class EpubFormat(BaseFormat):
     def _load_ops_data(self, xml_data):
         """Constructs a dictionary from OPS XML data.
         """
-        search = self._configuration['search']
         return {
-            "title": search(xml_data, "title") or "",
-            "author": self._author(search(xml_data, "creator") or ""),
-            "isbn": self._isbn(search(xml_data, "identifier") or "")
+            "title": self._search(xml_data, "title") or "",
+            "author": self._author(self._search(xml_data, "creator") or ""),
+            "isbn": self._isbn(self._search(xml_data, "identifier") or "")
         }
