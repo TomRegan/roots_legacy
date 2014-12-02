@@ -52,12 +52,17 @@ class BaseFormat(object):
         matches = re.search(expr, number)
         return matches is not None and matches.group(1) or None
 
-    def _search(self, x, y):
-        if x is None or y is None:
+    def _search(self, element, tag_name, attribute=None):
+        if element is None or tag_name is None:
             return
-        elements = [e for e in x.iter() if e.tag.endswith(y)]
+        elements = [e for e in element.iter() if e.tag.endswith(tag_name)]
         if elements is None or len(elements) < 1:
             return
+        elif attribute is not None:
+            for element in elements:
+                for attr in element.items():
+                    if attr[1].lower() == attribute.lower():
+                        return element.text
         return elements[0].text or elements[0]
 
 
@@ -104,7 +109,7 @@ class EpubFormat(BaseFormat):
         """Constructs a dictionary from OPS XML data.
         """
         return {
-            "title": self._search(xml_data, "title") or "",
-            "author": self._author(self._search(xml_data, "creator") or ""),
-            "isbn": self._isbn(self._search(xml_data, "identifier") or "")
+            'title': self._search(xml_data, 'title') or '',
+            'author': self._author(self._search(xml_data, 'creator') or ''),
+            'isbn': self._isbn(self._search(xml_data, 'identifier', 'isbn') or '')
         }

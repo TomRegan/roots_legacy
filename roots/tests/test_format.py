@@ -67,7 +67,13 @@ class FormatTest(unittest.TestCase):
             '<dc:identifier opf:scheme="ISBN">9781101882924</dc:identifier>'
             '<dc:identifier opf:scheme="MOBI-ASIN">B00LKJHTJU</dc:identifier>'
         ))
-        self.assertEquals("9781101882924", cls._search(element, 'identifier'))
+        self.assertEquals("9781101882924", cls._search(element, 'identifier', 'isbn'))
+
+        element = etree.fromstring(self._opf_helper(
+            '<dc:identifier opf:scheme="MOBI-ASIN">B00LKJHTJU</dc:identifier>'
+            '<dc:identifier opf:scheme="ISBN">9781101882924</dc:identifier>'
+        ))
+        self.assertEquals("9781101882924", cls._search(element, 'identifier', 'isbn'))
 
     def test_xml_search_for_rootfile(self):
         cls = BaseFormat()
