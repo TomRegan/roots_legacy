@@ -39,9 +39,13 @@ def default_configuration():
             'overwrite': False,
             'hash': False
         },
+        'isbndb' : {
+            'key' : None,
+            'limit' : None
+        },
         'system': {
             'configfile': 'Default configuration',
-            'configpath': 'Default configuration'
+            'configpath': None
         }
     }
 
