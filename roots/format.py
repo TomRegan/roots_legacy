@@ -79,8 +79,8 @@ class EpubFormat(BaseFormat):
             book = self._load_ops_data(content_xml)
             if self._configuration['import']['hash']:
                 with open(srcpath, 'rb') as zipfile:
-                    book['sha_hash'] = sha1(zipfile.read()).hexdigest()
-            book['url_path'] = urljoin('file:', to_url(srcpath))
+                    book['_sha_hash'] = sha1(zipfile.read()).hexdigest()
+            book['_url_path'] = urljoin('file:', to_url(srcpath))
             return book
 
     def _load_metadata(self, epub_filename):

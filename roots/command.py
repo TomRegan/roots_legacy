@@ -155,7 +155,8 @@ Synopsis: Shows fields that can be used in queries.
             fields = set()
             for book in books:
                 for field in book.keys():
-                    fields.add(field)
+                    if field[0] is not '_':
+                        fields.add(field)
             print '\n'.join(fields)
 
 
