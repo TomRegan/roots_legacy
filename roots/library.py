@@ -35,7 +35,8 @@ class IsbndbService(object):
         books.
         """
         results = []
-        request_base = 'http://isbndb.com/api/v2/yaml/AAAAAAAA'
+        api_key = self._configuration['isbndb']['key']
+        request_base = 'http://isbndb.com/api/v2/yaml/' + api_key
         for book in books:
             request = '%s/book/%s' % (request_base, book['isbn'])
             r = requests.get(request)

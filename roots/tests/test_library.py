@@ -40,7 +40,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService({})
+        cls = IsbndbService(self.configuration)
         response = cls.request(input)
         self.assertEquals(1, len(responses.calls))
         self.assertEquals('Gillian Flynn', response[0]['author'])
@@ -73,7 +73,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.just_a_geek_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService({})
+        cls = IsbndbService(self.configuration)
         response = cls.request(input)
         self.assertEquals(2, len(responses.calls))
         self.assertEquals(2, len(response))
@@ -104,7 +104,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService({})
+        cls = IsbndbService(self.configuration)
         response = cls.request(input)
         self.assertEquals(2, len(responses.calls))
         self.assertEquals(1, len(response))
@@ -116,13 +116,34 @@ class TestLibrary(unittest.TestCase):
                            'mystery'}, response[0]['keywords'])
 
 
+    @responses.activate
+    def test_the_correct_auth_key_is_used(self):
+        input = [{
+            'author': 'Gillian Flynn',
+            'title': 'Gone Girl',
+            'isbn': '0999999X'
+        }]
 
-    # should request by title if ISBN is missing or wrong
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/BBBBBB/book/0999999X',
+                      body=self.gone_girl_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+
+        cls = IsbndbService({'isbndb' : {
+            'key': 'BBBBBB'
+        }})
+        cls.request(input)
+        self.assertEquals(
+            'http://isbndb.com/api/v2/yaml/BBBBBB/book/0999999X',
+            responses.calls[0].response.url)
+
     # should handle no data ever found
     # should handle missing isbn in request
     # should handle missing data in response (isbn, author, title)
-    # should use the correct auth key
     # result should include the original set of books
+    # DONE
+    # should request by title if ISBN is missing or wrong
+    # should use the correct auth key
 
 
     gone_girl_response = yaml.dump({
@@ -162,6 +183,9 @@ class TestLibrary(unittest.TestCase):
         }],
         'index_searched': 'isbn'
     }, default_flow_style=False)
+
+    configuration = {'isbndb':{'key': 'AAAAAAAA'}}
+
 
 if __name__ == '__main__':
     unittest.main()
