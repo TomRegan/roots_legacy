@@ -17,10 +17,8 @@
 
 import yaml
 
-from roots.configuration import default_configuration
 from roots.library import IsbndbService
 
-import requests
 import responses
 
 import unittest
@@ -29,43 +27,87 @@ import unittest
 class TestLibrary(unittest.TestCase):
 
     @responses.activate
-    def test_expectations(self):
-        c = default_configuration()
-        c['isbndb'] = {
-            'key': 'AAAAAAAA',
-            'rate': 5
-        }
-
-        response = {
-            'data': [{
-                'isbn13': '9780297859383',
-                'isbn10': '0297859382',
-                'summary': 'SUMMARY',
-                'author_data': [{
-                    'id': 'gillian_flynn',
-                    'name': 'Gillian Flynn'
-                }],
-                'subject_ids': [
-                    'literature_fiction',
-                    'mystery_thriller_suspense_mystery'
-                ],
-                'title': 'Gone Girl'
-            }],
-            'index_searched': 'isbn'
-        }
+    def test_response_includes_all_fields(self):
 
         input = [{
             'author': 'Gillian Flynn',
             'title': 'Gone Girl',
             'isbn': '9780297859383'
         }]
-        url = 'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383'
-        responses.add(responses.GET, (url),
-                      body=yaml.dump(response, default_flow_style=False),
-                      status=200, content_type='text/xml; charset=utf-8')
+
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383',
+                      body=self.gone_girl_response, status=200,
+                      content_type='text/xml; charset=utf-8')
 
         cls = IsbndbService({})
         response = cls.request(input)
+        self.assertEquals(1, len(responses.calls))
+        self.assertEquals('Gillian Flynn', response[0]['author'])
+        self.assertEquals('Gone Girl', response[0]['title'])
+        self.assertEquals('9780297859383', response[0]['isbn'])
+        self.assertEquals('SUMMARY', response[0]['description'])
+        self.assertEquals({'literature', 'fiction', 'thriller', 'suspense',
+                           'mystery'}, response[0]['keywords'])
+
+    @responses.activate
+    def test_lists_of_books_are_updated(self):
+
+        input = [{
+            'author': 'Gillian Flynn',
+            'title': 'Gone Girl',
+            'isbn': '9780297859383'
+        }, {
+            'author': 'Wil Wheaton',
+            'title': 'Just a Geek',
+            'isbn': '9780596806'
+        }]
+
+        url = 'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383'
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383',
+                      body=self.gone_girl_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780596806',
+                      body=self.just_a_geek_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+
+        cls = IsbndbService({})
+        response = cls.request(input)
+        self.assertEquals(2, len(responses.calls))
+        self.assertEquals(2, len(response))
+        self.assertEquals('Wil Wheaton', response[1]['author'])
+        self.assertEquals('Just a Geek', response[1]['title'])
+        self.assertEquals('9789780596804', response[1]['isbn'])
+        self.assertEquals('', response[1]['description'])
+        self.assertEquals({'wheaton', 'wil', 'television', 'actors',
+                           'actresses', 'united', 'states', 'biography',
+                           'webmasters', 'fame'}, response[1]['keywords'])
+
+    @responses.activate
+    def test_error_received_from_service(self):
+        input = [{
+            'author': 'Gillian Flynn',
+            'title': 'Gone Girl',
+            'isbn': '0999999X'
+        }]
+
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/0999999X',
+                      body=yaml.dump({
+                          'error': 'Unable to locate 0999999X'
+                      }, default_flow_style=False),
+                      content_type='text/xml; charset=utf-8')
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/gone_girl',
+                      body=self.gone_girl_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+
+        cls = IsbndbService({})
+        response = cls.request(input)
+        self.assertEquals(2, len(responses.calls))
+        self.assertEquals(1, len(response))
         self.assertEquals('Gillian Flynn', response[0]['author'])
         self.assertEquals('Gone Girl', response[0]['title'])
         self.assertEquals('9780297859383', response[0]['isbn'])
@@ -74,11 +116,52 @@ class TestLibrary(unittest.TestCase):
                            'mystery'}, response[0]['keywords'])
 
 
-    # should handle lists of books
+
+    # should request by title if ISBN is missing or wrong
+    # should handle no data ever found
     # should handle missing isbn in request
     # should handle missing data in response (isbn, author, title)
     # should use the correct auth key
+    # result should include the original set of books
 
+
+    gone_girl_response = yaml.dump({
+        'data': [{
+            'isbn13': '9780297859383',
+            'isbn10': '0297859382',
+            'summary': 'SUMMARY',
+            'author_data': [{
+                'id': 'gillian_flynn',
+                'name': 'Gillian Flynn'
+            }],
+            'subject_ids': [
+                'literature_fiction',
+                'mystery_thriller_suspense_mystery'
+            ],
+            'title': 'Gone Girl'
+        }],
+        'index_searched': 'isbn'
+    }, default_flow_style=False)
+
+    just_a_geek_response = yaml.dump({
+        'data': [{
+            'isbn10': '9780596806',
+            'isbn13': '9789780596804',
+            'summary': '',
+            'author_data': [{
+                'id': 'wil_wheaton',
+                'name': 'Wil Wheaton'
+            }],
+            'subject_ids': [
+                'wheaton_wil1',
+                'television_actors_and_actresses_united_states_biography1',
+                'webmasters_united_states_biography1',
+                'fame1'
+            ],
+            'title': 'Just a Geek'
+        }],
+        'index_searched': 'isbn'
+    }, default_flow_style=False)
 
 if __name__ == '__main__':
     unittest.main()

@@ -17,30 +17,60 @@
 import yaml
 import requests
 
+from string import digits
+
 
 class IsbndbService(object):
+
+    """Provides e-book information by claaing the isbndb api.
+    """
+
+    _blacklist = ['and']
+
     def __init__(self, configuration):
         self._configuration = configuration
 
     def request(self, books):
-        r = requests.get(
-            'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383'
-        )
-        data = yaml.load(r.text)['data'][0]
-        return [{
-            'title': data['title'],
-            'author': self._author(data),
-            'isbn': data['isbn13'],
-            'keywords': self._keywords(data),
-            'description': data['summary']
-        }]
+        """Given a list of books, returns an updated list of
+        books.
+        """
+        results = []
+        request_base = 'http://isbndb.com/api/v2/yaml/AAAAAAAA'
+        for book in books:
+            request = '%s/book/%s' % (request_base, book['isbn'])
+            r = requests.get(request)
+            response = yaml.load(r.text)
+            # it doesn't need doing properly yet!
+            if 'data' not in response.keys():
+                request = '%s/book/%s' % (
+                    request_base, book['title'].replace(' ', '_').lower()
+                )
+                r = requests.get(request)
+                response = yaml.load(r.text)
+                print response
+                if 'data' not in response.keys():
+                    continue
+            data = response['data'][0]
+            results.append({
+                'title': data['title'],
+                'author': self._author(data),
+                'isbn': data['isbn13'],
+                'keywords': self._keywords(data),
+                'description': data['summary']
+            })
+        return results
 
     def _keywords(self, data):
+        """Takes an underscore-separated list of keywords and
+        returns a list of keywords with blacklisted words removed
+        and digits stripped.
+        """
         subject_ids = data['subject_ids']
         return {
-            keyword for subject_ids in
+            keyword.translate(None, digits) for subject_ids in
             [subject_id.split('_') for subject_id in subject_ids]
             for keyword in subject_ids
+            if keyword not in self._blacklist
         }
 
     def _author(self, data):
