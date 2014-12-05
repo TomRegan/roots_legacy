@@ -1,0 +1,44 @@
+---
+data:
+- author_data:
+  - id: gillian_flynn
+    name: Gillian Flynn
+  awards_text: ''
+  book_id: gone_girl_a03
+  dewey_decimal: ''
+  dewey_normal: '0'
+  edition_info: Hardcover; 2012
+  isbn10: '0297859382'
+  isbn13: '9780297859383'
+  language: ''
+  lcc_number: ''
+  marc_enc_level: '~'
+  notes: ''
+  physical_description_text: 6.1"x9.3"x1.5"; 1.3 lb; 416 pages
+  publisher_id: w_n_hardback_edition_24_may_20
+  publisher_name: W&N; Hardback edition (24 May 2012)
+  publisher_text: W&N; Hardback edition (24 May 2012)
+  subject_ids:
+  - literature_fiction
+  - mystery_thriller_suspense_mystery
+  summary: 'Product Description ''What are you thinking, Amy? The question I''ve asked
+    most often during our marriage, if not out loud, if not to the person who could
+    answer. I suppose these questions stormcloud over every marriage: What are you
+    thinking? How are you feeling? Who are you? What have we done to each other? What
+    will we do?'' Just how well can you ever know the person you love? This is the
+    question that Nick Dunne must ask himself on the morning of his fifth wedding
+    anniversary, when his wife Amy suddenly disappears. The police immediately suspect
+    Nick. Amy''s friends reveal that she was afraid of him, that she kept secrets
+    from him. He swears it isn''t true. A police examination of his computer shows
+    strange searches. He says they aren''t his. And then there are the persistent
+    calls on his mobile phone. So what did really did happen to Nick''s beautiful
+    wife? And what was left in that half-wrapped box left so casually on their marital
+    bed? In this novel, marriage truly is the art of war... About the Author Gillian
+    Flynn''s first novel SHARP OBJECTS was the winner of two CWA DAGGERS, and was
+    shortlisted for the GOLD DAGGER, and also for an EDGAR. She lives in Chicago with
+    her husband.'
+  title: Gone Girl
+  title_latin: Gone Girl
+  title_long: Gone Girl [Hardcover]
+  urls_text: ''
+index_searched: isbn
