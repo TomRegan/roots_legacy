@@ -14,13 +14,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
 import yaml
 
 from roots.library import IsbndbService
 
 import responses
-
 import unittest
 
 
@@ -137,13 +135,36 @@ class TestLibrary(unittest.TestCase):
             'http://isbndb.com/api/v2/yaml/BBBBBB/book/0999999X',
             responses.calls[0].response.url)
 
-    # should handle no data ever found
-    # should handle missing isbn in request
-    # should handle missing data in response (isbn, author, title)
-    # result should include the original set of books
-    # DONE
-    # should request by title if ISBN is missing or wrong
-    # should use the correct auth key
+    @responses.activate
+    def test_no_data_found(self):
+        input = [{
+            'author': 'Gillian Flynn',
+            'title': 'Gone Girl',
+            'isbn': '0999999X'
+        }]
+
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/0999999X',
+                      body=yaml.dump({
+                          'error': 'Unable to locate 0999999X'
+                      }, default_flow_style=False),
+                      content_type='text/xml; charset=utf-8')
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/gone_girl',
+                      body=yaml.dump({
+                          'error': 'Unable to locate 0999999X'
+                      }, default_flow_style=False),
+                      content_type='text/xml; charset=utf-8')
+
+        cls = IsbndbService(self.configuration)
+        response = cls.request(input)
+        self.assertEquals('Gillian Flynn', response[0]['author'])
+        self.assertEquals('Gone Girl', response[0]['title'])
+        self.assertEquals('0999999X', response[0]['isbn'])
+
+
+    # TODO
+    # support throttling api requests
 
 
     gone_girl_response = yaml.dump({

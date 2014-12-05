@@ -48,8 +48,8 @@ class IsbndbService(object):
                 )
                 r = requests.get(request)
                 response = yaml.load(r.text)
-                print response
                 if 'data' not in response.keys():
+                    results.append(book)
                     continue
             data = response['data'][0]
             results.append({
