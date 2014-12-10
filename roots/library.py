@@ -34,6 +34,11 @@ class IsbndbService(object):
         """Given a list of books, returns an updated list of
         books.
         """
+        # little bit too ill to write this, but create isbndb
+        # data store in config dir, store timestamped throttle
+        # value along with cached rest responses
+        # this will allow throttling to work, and save a rest
+        # call if we happen to be updating the library
         results = []
         api_key = self._configuration['isbndb']['key']
         request_base = 'http://isbndb.com/api/v2/yaml/' + api_key

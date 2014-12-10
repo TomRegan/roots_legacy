@@ -162,9 +162,28 @@ class TestLibrary(unittest.TestCase):
         self.assertEquals('Gone Girl', response[0]['title'])
         self.assertEquals('0999999X', response[0]['isbn'])
 
+    @unittest.skip('still in development')
+    @responses.activate
+    def test_the_throttle_rate_is_not_exceeded(self):
+        input = [{
+            'author': 'Gillian Flynn',
+            'title': 'Gone Girl',
+            'isbn': '0999999X'
+        }]
 
-    # TODO
-    # support throttling api requests
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/0999999X',
+                      body=self.gone_girl_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+
+        cls = IsbndbService({'isbndb' : {
+            'key': 'AAAAAAAA',
+            'rate': 1
+        }})
+
+        cls.request(input)
+        cls.request(input)
+        self.assertEquals(1, len(responses.calls))
 
 
     gone_girl_response = yaml.dump({

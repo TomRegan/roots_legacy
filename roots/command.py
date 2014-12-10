@@ -20,6 +20,7 @@ from os import walk, makedirs
 from sys import modules
 from inspect import isclass, getmembers
 from shutil import copy2 as _copy
+from texttable import Texttable
 
 import pickle
 import yaml
@@ -66,6 +67,7 @@ Synopsis: Queries the library.
 Options:
   -a  Show a list of matching authors.
   -i  Shou the ISBN number of each title.
+  -t  Print the matches in a table.
 
 Examples:
   root list author:forster
@@ -102,6 +104,8 @@ Examples:
                            in unicode(book[restrict]).upper()]
         if len(results) == 0:
             self._configuration['terminal'].warn('No matches for %s.', select)
+        elif self._arguments['-t']:
+            self._print_results_table(results)
         else:
             self._print_results(results)
 
@@ -129,6 +133,20 @@ Examples:
         else:
             for result in sorted(results):
                 print "%s - %s" % result[:2]
+
+    def _print_results_table(self, results):
+        """Print results formatted in a table.
+        """
+        table = Texttable()
+        table.set_chars(['-', '|', '+', '-'])
+        table.set_deco(Texttable.BORDER | Texttable.HEADER | Texttable.VLINES)
+        table.set_cols_dtype(['t', 't', 't'])
+        table.header(['Author', 'Title', 'Isbn'])
+        for author, title, isbn in results:
+            if isbn is None: isbn = ""
+            table.add_row([author.encode('utf-8'), title.encode('utf-8)'),
+                           isbn.encode('utf-8')])
+        print table.draw()
 
 
 class Fields(BaseCommand):

@@ -17,7 +17,7 @@
 Usage:
   root import <path>
   root update
-  root list [-a | -i] [<query>]...
+  root list [-a | -i | -t] [<query>]...
   root fields
   root config [-p | -d | --path | --default]
   root help <command>
