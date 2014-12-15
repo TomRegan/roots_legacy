@@ -61,7 +61,7 @@ class BaseCommand(object):
 
 class List(BaseCommand):
 
-    """Usage: root list [-a | -i] [<query>]...
+    """Usage: root list [-ait] [<query>]...
 Synopsis: Queries the library.
 
 Options:
@@ -84,27 +84,45 @@ Examples:
         self._arguments = arguments
         self._configuration = configuration
 
-    @property
     def do(self):
         """Loads the library metadata and selects entries from it.
         """
+        term = self._configuration['terminal']
+        #
+        # move library loading to own module
+        #
+        # books = library.load_books(self._configuration)
         library_path = join(self._configuration['system']['configpath'],
                             self._configuration['library'])
+        if not exists(library_path):
+            raise Exception('Cannot open library: %s', library_path)
         with open(library_path, 'rb') as library_file:
-            books = pickle.load(library_file)
-            restrict, select = self._parse_query()
-            if select is None:
-                results = [(book['author'], book['title'], book['isbn'])
-                           for book in books]
-            else:
-                results = [(book['author'], book['title'], book['isbn'])
-                           for book in books
-                           if restrict in book.keys()
-                           and select.upper()
-                           in unicode(book[restrict]).upper()]
+            db = pickle.load(library_file)
+        if 'version' not in db:
+            books = db
+        elif float(db['version']) == 1.0:
+            books = db['library']
+        else:
+            fmt = ("Failed while trying to read: %s"
+                   "\nUnsupported database version: %s")
+            args = library_path, str(float(db['version']))
+            raise Exception(fmt, *args)
+        #
+        # above needs to go in a new module
+        #
+        restrict, select = self._parse_query()
+        if select is None:
+            results = [(book['author'], book['title'], book['isbn'])
+                       for book in books]
+        else:
+            results = [(book['author'], book['title'], book['isbn'])
+                       for book in books
+                       if restrict in book.keys()
+                       and select.upper()
+                       in unicode(book[restrict]).upper()]
         if len(results) == 0:
-            self._configuration['terminal'].warn('No matches for %s.', select)
-        elif self._arguments['-t']:
+            raise Exception("No matches for %s.", select)
+        elif self._configuration['list']['table'] or self._arguments['-t']:
             self._print_results_table(results)
         else:
             self._print_results(results)
@@ -127,7 +145,7 @@ Examples:
         if self._arguments['-a']:
             for author in sorted({result[0] for result in results}):
                 print author
-        elif self._arguments['-i']:
+        elif self._configuration['list']['isbn'] or self._arguments['-i']:
             for result in sorted(results):
                 print "%s - %s - %s" % result
         else:
@@ -140,12 +158,19 @@ Examples:
         table = Texttable()
         table.set_chars(['-', '|', '+', '-'])
         table.set_deco(Texttable.BORDER | Texttable.HEADER | Texttable.VLINES)
-        table.set_cols_dtype(['t', 't', 't'])
-        table.header(['Author', 'Title', 'Isbn'])
+        header_type = ['t', 't']
+        header = ['Auther', 'Title']
+        if self._configuration['list']['isbn'] or self._arguments['-i']:
+            header_type += ['t']
+            header += ['Isbn']
+        table.set_cols_dtype(header_type)
+        table.header(header)
         for author, title, isbn in results:
             if isbn is None: isbn = ""
-            table.add_row([author.encode('utf-8'), title.encode('utf-8)'),
-                           isbn.encode('utf-8')])
+            row = [author.encode('utf-8'), title.encode('utf-8')]
+            if self._configuration['list']['isbn'] or self._arguments['-i']:
+                row += [isbn.encode('utf-8')]
+            table.add_row(row)
         print table.draw()
 
 
@@ -160,7 +185,6 @@ Synopsis: Shows fields that can be used in queries.
         self._configuration = configuration
         self._term = self._configuration['terminal']
 
-    @property
     def do(self):
         library_path = join(self._configuration['system']['configpath'],
                             self._configuration['library'])
@@ -196,7 +220,6 @@ Examples:
                           if n is not self.name
                           and n not in ['BaseCommand', 'EpubFormat']}
 
-    @property
     def do(self):
         """Prints documentation for the command.
         """
@@ -229,7 +252,6 @@ Options:
         self._configuration = configuration
         self._arguments = arguments
 
-    @property
     def do(self):
         """Prints configuration.
         """
@@ -254,7 +276,6 @@ Synopsis: Updates the library.
         self._arguments = arguments
         self._configuration = configuration
 
-    @property
     def do(self):
         """Updates the library.
         """
@@ -272,8 +293,8 @@ Synopsis: Updates the library.
         library = join(self._configuration['system']['configpath'],
                        self._configuration['library'])
         with open(library, 'wb') as library_file:
-            pickle.dump(books, library_file)
-            count = len(books)
+            pickle.dump({'version':'1', 'library':books}, library_file)
+        count = len(books)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
 
@@ -291,19 +312,15 @@ Examples:
         self._arguments = arguments
         self._configuration = configuration
 
-    @property
     def do(self):
         """Imports new e-books.
         """
-        term = self._configuration['terminal']
         srcpath = self._arguments['<path>']
         if isfile(srcpath):
-            term.warn("source path should not be a file: %s", srcpath)
-            return
+            raise Exception("Source path should not be a file: %s", srcpath)
         directory = self._configuration['directory']
         if not exists(directory):
-            term.warn('Cannot open library: %s', directory)
-            return
+            raise Exception('Cannot open library: %s', directory)
         moves = self._consider_moves()
         count = self._move_to_library(moves)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')

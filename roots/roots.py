@@ -17,7 +17,7 @@
 Usage:
   root import <path>
   root update
-  root list [-a | -i | -t] [<query>]...
+  root list [-ait] [<query>]...
   root fields
   root config [-p | -d | --path | --default]
   root help <command>
@@ -66,9 +66,13 @@ class Terminal(blessings.Terminal):
 
 def do_command(arguments, configuration):
     """TODO"""
-    configuration['terminal'] = Terminal()
+    term = Terminal()
+    configuration['terminal'] = term
     cmd = command(arguments, configuration)
-    cmd.do
+    try:
+        cmd.do()
+    except Exception, e:
+        term.warn(e.args[0], *e.args[1:])
 
 
 def main():

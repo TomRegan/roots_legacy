@@ -43,6 +43,10 @@ def default_configuration():
             'key' : None,
             'limit' : None
         },
+        'list': {
+            'table': False,
+            'isbn': False
+        },
         'system': {
             'configfile': 'Default configuration',
             'configpath': None
