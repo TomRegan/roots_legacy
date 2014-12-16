@@ -23,6 +23,7 @@ import re
 from urlparse import urljoin
 from urllib import pathname2url as to_url
 from hashlib import sha1
+from HTMLParser import HTMLParser
 
 
 class BaseFormat(object):
@@ -62,8 +63,11 @@ class BaseFormat(object):
             for element in elements:
                 for attr in element.items():
                     if attr[1].lower() == attribute.lower():
-                        return element.text
-        return elements[0].text or elements[0]
+                        return self._unescape(element.text)
+        return self._unescape(elements[0].text or elements[0])
+
+    def _unescape(self, string):
+        return HTMLParser().unescape(string)
 
 
 class EpubFormat(BaseFormat):
@@ -86,23 +90,21 @@ class EpubFormat(BaseFormat):
     def _load_metadata(self, epub_filename):
         """Reads an epub file and returns its OPS / OEBPS blob.
         """
-        term = self._configuration['terminal']
         if not zipfile.is_zipfile(epub_filename):
-            term.warn("Not importing %s because it is not a .epub file.",
-                      epub_filename.replace("./", ""))
-            return
+            raise Exception("Not importing %s because it is not a .epub file.",
+                            epub_filename.replace("./", ""))
         with zipfile.ZipFile(epub_filename, 'r') as epub_file:
             meta_data = None
             try:
                 meta_data = epub_file.read("META-INF/container.xml")
             except Exception:
-                term.warn("Could not locate a container file in %s", epub_filename)
-                return
+                raise Exception("Could not locate a container file in %s",
+                                epub_filename)
             meta_xml = ET.fromstring(meta_data)
             full_path = self._search(meta_xml, "rootfile")
             if full_path is None:
-                term.warn("Could not locate a metadata file in %s", epub_filename)
-                return
+                raise Exception("Could not locate a metadata file in %s",
+                                epub_filename)
             return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
 
     def _load_ops_data(self, xml_data):

@@ -338,7 +338,8 @@ Examples:
                 book = EpubFormat(self._configuration).load(srcpath)
                 if book is None:
                     continue
-                destination_dir = join(library, book['author'])
+                destination_dir = join(library, self._clean_path(
+                    book['author']))
                 destination_file = self._clean_path(
                     book['title'] + '.epub')
                 destpath = join(destination_dir, destination_file)
