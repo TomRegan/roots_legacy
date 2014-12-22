@@ -1,20 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#   Copyright 2014 Tom Regan
+# Copyright 2014 Tom Regan
 #
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#       http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Commands.
 """
+
 from os.path import join, isfile, exists, basename
 from os import walk, makedirs
 from sys import modules
@@ -22,11 +24,11 @@ from inspect import isclass, getmembers
 from shutil import copy2 as _copy
 from texttable import Texttable
 
-import pickle
 import yaml
 
 from configuration import user_configuration, default_configuration
 from format import EpubFormat
+import library
 
 
 def command(arguments, configuration):
@@ -87,29 +89,7 @@ Examples:
     def do(self):
         """Loads the library metadata and selects entries from it.
         """
-        term = self._configuration['terminal']
-        #
-        # move library loading to own module
-        #
-        # books = library.load_books(self._configuration)
-        library_path = join(self._configuration['system']['configpath'],
-                            self._configuration['library'])
-        if not exists(library_path):
-            raise Exception('Cannot open library: %s', library_path)
-        with open(library_path, 'rb') as library_file:
-            db = pickle.load(library_file)
-        if 'version' not in db:
-            books = db
-        elif float(db['version']) == 1.0:
-            books = db['library']
-        else:
-            fmt = ("Failed while trying to read: %s"
-                   "\nUnsupported database version: %s")
-            args = library_path, str(float(db['version']))
-            raise Exception(fmt, *args)
-        #
-        # above needs to go in a new module
-        #
+        books = library.load(self._configuration)
         restrict, select = self._parse_query()
         if select is None:
             results = [(book['author'], book['title'], book['isbn'])
@@ -181,25 +161,16 @@ Synopsis: Shows fields that can be used in queries.
 """
 
     def __init__(self, arguments, configuration):
-        self._arguments = arguments
         self._configuration = configuration
-        self._term = self._configuration['terminal']
 
     def do(self):
-        library_path = join(self._configuration['system']['configpath'],
-                            self._configuration['library'])
-        if not isfile(library_path):
-            self._term.warn('Cannot open database file: %s',
-                            self._configuration['library'])
-            return
-        with open(library_path, 'rb') as library_file:
-            books = pickle.load(library_file)
-            fields = set()
-            for book in books:
-                for field in book.keys():
-                    if field[0] is not '_':
-                        fields.add(field)
-            print '\n'.join(fields)
+        books = library.load(self._configuration)
+        fields = set()
+        for book in books:
+            for field in book.keys():
+                if field[0] is not '_':
+                    fields.add(field)
+        print '\n'.join(fields)
 
 
 class Help(BaseCommand):
@@ -281,19 +252,14 @@ Synopsis: Updates the library.
         """
         books = []
         directory = self._configuration['directory']
-        term = self._configuration['terminal']
         if not exists(directory):
-            term.warn('Cannot open library: %s', directory)
-            return
+            raise Exception('Cannot open library: %s', directory)
         for basepath, _, filenames in walk(directory):
             for filename in filenames:
                 if filename.endswith(".epub"):
                     srcpath = join(basepath, filename)
                     books.append(EpubFormat(self._configuration).load(srcpath))
-        library = join(self._configuration['system']['configpath'],
-                       self._configuration['library'])
-        with open(library, 'wb') as library_file:
-            pickle.dump({'version':'1', 'library':books}, library_file)
+        library.store(self._configuration, books)
         count = len(books)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
@@ -321,15 +287,16 @@ Examples:
         directory = self._configuration['directory']
         if not exists(directory):
             raise Exception('Cannot open library: %s', directory)
-        moves = self._consider_moves()
+        moves, books = self._consider_moves()
         count = self._move_to_library(moves)
+        library.store(self._configuration, books)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
     def _consider_moves(self):
         """Determines the files to be moved and their destinations.
         """
         library = self._configuration['directory']
-        moves = []
+        moves, books = [], []
         for basepath, _, filenames in walk(self._arguments['<path>']):
             for filename in filenames:
                 if not filename.endswith(".epub"):
@@ -344,7 +311,8 @@ Examples:
                     book['title'] + '.epub')
                 destpath = join(destination_dir, destination_file)
                 moves.append((srcpath, destpath, destination_dir))
-        return moves
+                books.append(book)
+        return moves, books
 
     def _clean_path(self, srcpath):
         """Takes a path (as a Unicode string) and makes sure that it is
