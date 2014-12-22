@@ -16,13 +16,13 @@
 
 import yaml
 
-from roots.library import IsbndbService
+from roots.isbndb import Request
 
 import responses
 import unittest
 
 
-class TestLibrary(unittest.TestCase):
+class TestIsbndb(unittest.TestCase):
 
     @responses.activate
     def test_response_includes_all_fields(self):
@@ -38,7 +38,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService(self.configuration)
+        cls = Request(self.configuration)
         response = cls.request(input)
         self.assertEquals(1, len(responses.calls))
         self.assertEquals('Gillian Flynn', response[0]['author'])
@@ -71,7 +71,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.just_a_geek_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService(self.configuration)
+        cls = Request(self.configuration)
         response = cls.request(input)
         self.assertEquals(2, len(responses.calls))
         self.assertEquals(2, len(response))
@@ -102,7 +102,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService(self.configuration)
+        cls = Request(self.configuration)
         response = cls.request(input)
         self.assertEquals(2, len(responses.calls))
         self.assertEquals(1, len(response))
@@ -127,7 +127,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService({'isbndb' : {
+        cls = Request({'isbndb' : {
             'key': 'BBBBBB'
         }})
         cls.request(input)
@@ -156,7 +156,7 @@ class TestLibrary(unittest.TestCase):
                       }, default_flow_style=False),
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService(self.configuration)
+        cls = Request(self.configuration)
         response = cls.request(input)
         self.assertEquals('Gillian Flynn', response[0]['author'])
         self.assertEquals('Gone Girl', response[0]['title'])
@@ -176,7 +176,7 @@ class TestLibrary(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = IsbndbService({'isbndb' : {
+        cls = Request({'isbndb' : {
             'key': 'AAAAAAAA',
             'rate': 1
         }})
