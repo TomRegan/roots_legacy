@@ -36,7 +36,7 @@ def load(configuration):
     return db['library']
 
 
-def store(configuration, books):
+def store(configuration, data):
     """Stores a list of books in the library.
     """
     library_path = join(configuration['system']['configpath'],
@@ -48,9 +48,8 @@ def store(configuration, books):
         with open(library_path, 'rb+') as library_file:
             try:
                 db = pickle.load(library_file)
-                db['library'] = books
-                term.debug("Loaded data: %s", db)
-                library_file.seek(0)
+                for subject, entry in data.iteritems():
+                    db[subject] = entry
                 pickle.dump(db, library_file)
             except:
                 backup_path = library_path + '.bak'
@@ -58,8 +57,8 @@ def store(configuration, books):
                 term.warn("The library may be corrupt. Created a back up of "
                           "%s (%s). You may want to remove this backup "
                           "file", library_path, backup_path)
-                store(configuration, books)
+                store(configuration, data)
     else:
         with open(library_path, 'wb') as library_file:
-            db = {'version':'1', 'library':books}
+            db = {'version':'1', 'library': data}
             pickle.dump(db, library_file)

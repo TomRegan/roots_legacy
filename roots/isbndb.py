@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#  Copyright 2014 Tom Regan
+# Copyright 2014 Tom Regan
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Classes for interracting with the library.
 """
@@ -21,6 +21,8 @@ import yaml
 import requests
 
 from string import digits
+
+import library
 
 
 class Request(object):
@@ -32,20 +34,30 @@ class Request(object):
 
     def __init__(self, configuration):
         self._configuration = configuration
+        self._term = configuration['terminal']
 
     def request(self, books):
         """Given a list of books, returns an updated list of
         books.
         """
-        # little bit too ill to write this, but create isbndb
-        # data store in config dir, store timestamped throttle
-        # value along with cached rest responses
-        # this will allow throttling to work, and save a rest
-        # call if we happen to be updating the library
+        try:
+            db = library.load(self._configuration)
+            rate = db['isbndb']['rate']
+        except:
+            rate = self._configuration['isbndb']['rate']
+            if rate is not None:
+                self._term.debug('%s ISBNDB requests permitted.', rate)
+            else:
+                self._term.debug('ISBNDB requests not limited.')
         results = []
         api_key = self._configuration['isbndb']['key']
         request_base = 'http://isbndb.com/api/v2/yaml/' + api_key
         for book in books:
+            if rate is not None:
+                if rate > 0:
+                    rate -= 1
+                else:
+                    raise Exception("Calls to ISBNDB are throttled. Check the configuration.")
             request = '%s/book/%s' % (request_base, book['isbn'])
             r = requests.get(request)
             response = yaml.load(r.text)
@@ -67,6 +79,8 @@ class Request(object):
                 'keywords': self._keywords(data),
                 'description': data['summary']
             })
+        if rate is not None:
+            library.store(self._configuration, {'isbndb': {'rate': rate}})
         return results
 
     def _keywords(self, data):

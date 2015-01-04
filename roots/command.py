@@ -260,7 +260,7 @@ Synopsis: Updates the library.
                     books.append(EpubFormat(self._configuration).load(srcpath))
         count = len(books)
         if count > 0:
-            library.store(self._configuration, books)
+            library.store(self._configuration, {'library': books})
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
 
@@ -291,7 +291,7 @@ Examples:
         moves, books = self._consider_moves()
         count = self._move_to_library(moves)
         if count > 0:
-            library.store(self._configuration, books)
+            library.store(self._configuration, {'library': books})
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
     def _consider_moves(self):

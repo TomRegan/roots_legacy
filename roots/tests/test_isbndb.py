@@ -17,8 +17,10 @@
 import yaml
 
 from roots.isbndb import Request
+from ..roots import Terminal
 
 import responses
+import tempfile
 import unittest
 
 
@@ -26,7 +28,6 @@ class TestIsbndb(unittest.TestCase):
 
     @responses.activate
     def test_response_includes_all_fields(self):
-
         input = [{
             'author': 'Gillian Flynn',
             'title': 'Gone Girl',
@@ -50,7 +51,6 @@ class TestIsbndb(unittest.TestCase):
 
     @responses.activate
     def test_lists_of_books_are_updated(self):
-
         input = [{
             'author': 'Gillian Flynn',
             'title': 'Gone Girl',
@@ -61,7 +61,6 @@ class TestIsbndb(unittest.TestCase):
             'isbn': '9780596806'
         }]
 
-        url = 'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383'
         responses.add(responses.GET,
                       'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383',
                       body=self.gone_girl_response, status=200,
@@ -127,9 +126,12 @@ class TestIsbndb(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = Request({'isbndb' : {
-            'key': 'BBBBBB'
-        }})
+        configuration = self.configuration
+        configuration['isbndb'] = {
+            'key': 'BBBBBB',
+            'rate': None
+        }
+        cls = Request(configuration)
         cls.request(input)
         self.assertEquals(
             'http://isbndb.com/api/v2/yaml/BBBBBB/book/0999999X',
@@ -162,9 +164,47 @@ class TestIsbndb(unittest.TestCase):
         self.assertEquals('Gone Girl', response[0]['title'])
         self.assertEquals('0999999X', response[0]['isbn'])
 
-    @unittest.skip('still in development')
     @responses.activate
     def test_the_throttle_rate_is_not_exceeded(self):
+
+        input = [{
+            'author': 'Gillian Flynn',
+            'title': 'Gone Girl',
+            'isbn': '9780297859383'
+        }, {
+            'author': 'Wil Wheaton',
+            'title': 'Just a Geek',
+            'isbn': '9780596806'
+        }, {
+            'author': 'Another Author',
+            'title': 'Should Never Request This',
+            'isbn': '099999999X'
+        }]
+
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780297859383',
+                      body=self.gone_girl_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+        responses.add(responses.GET,
+                      'http://isbndb.com/api/v2/yaml/AAAAAAAA/book/9780596806',
+                      body=self.just_a_geek_response, status=200,
+                      content_type='text/xml; charset=utf-8')
+
+        configuration = self.configuration
+        configuration['isbndb'] = {
+            'key': 'AAAAAAAA',
+            'rate': 2
+        }
+        cls = Request(configuration)
+
+        try:
+            cls.request(input)
+        except:
+            pass
+        self.assertEquals(2, len(responses.calls))
+
+    @responses.activate
+    def test_the_throttle_rate_is_not_exceeded_over_multiple_calls(self):
         input = [{
             'author': 'Gillian Flynn',
             'title': 'Gone Girl',
@@ -176,13 +216,18 @@ class TestIsbndb(unittest.TestCase):
                       body=self.gone_girl_response, status=200,
                       content_type='text/xml; charset=utf-8')
 
-        cls = Request({'isbndb' : {
+        configuration = self.configuration
+        configuration['isbndb'] = {
             'key': 'AAAAAAAA',
             'rate': 1
-        }})
+        }
+        cls = Request(configuration)
 
-        cls.request(input)
-        cls.request(input)
+        try:
+            cls.request(input)
+            cls.request(input)
+        except:
+            pass
         self.assertEquals(1, len(responses.calls))
 
 
@@ -224,7 +269,17 @@ class TestIsbndb(unittest.TestCase):
         'index_searched': 'isbn'
     }, default_flow_style=False)
 
-    configuration = {'isbndb':{'key': 'AAAAAAAA'}}
+    configuration = {
+        'isbndb': {
+            'key': 'AAAAAAAA',
+            'rate': None
+        },
+        'system': {
+            'configpath': tempfile.mkdtemp()
+        },
+        'library': 'library.db',
+        'terminal': Terminal()
+    }
 
 
 if __name__ == '__main__':
