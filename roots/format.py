@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#   Copyright 2014 Tom Regan
+# Copyright 2014 Tom Regan
 #
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-#       http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """e-book formats
 """
 
@@ -36,12 +36,18 @@ class BaseFormat(object):
     def _author(self, string):
         """Return the normalised author name.
         """
+        if string is None or len(string) == 0:
+            return None
         name = string.split(',')
-        return len(name) == 1 and string or ' '.join([name[1], name[0]]).strip()
+        if len(name) == 1:
+            return string
+        return ' '.join([name[1], name[0]]).strip()
 
     def _isbn(self, number):
         """Return an ISBN given a (possibly malformed) string.
         """
+        if number is None or len(number) == 0:
+            return
         number = number.replace('-', '')
         expr = (r'^[^\d]*('
                 r'(97[8|9])?'  # ean, excluded if ISBN-10
@@ -84,7 +90,6 @@ class EpubFormat(BaseFormat):
             if self._configuration['import']['hash']:
                 with open(srcpath, 'rb') as zipfile:
                     book['_sha_hash'] = sha1(zipfile.read()).hexdigest()
-            book['_url_path'] = urljoin('file:', to_url(srcpath))
             return book
 
     def _load_metadata(self, epub_filename):
@@ -98,20 +103,27 @@ class EpubFormat(BaseFormat):
             try:
                 meta_data = epub_file.read("META-INF/container.xml")
             except Exception:
-                raise Exception("Could not locate a container file in %s",
+                raise Exception("Could not locate a container file in %s.",
                                 epub_filename)
             meta_xml = ET.fromstring(meta_data)
             full_path = self._search(meta_xml, "rootfile")
             if full_path is None:
-                raise Exception("Could not locate a metadata file in %s",
+                raise Exception("Could not locate a metadata file in %s.",
                                 epub_filename)
             return ET.fromstring(epub_file.read(full_path.attrib["full-path"]))
 
     def _load_ops_data(self, xml_data):
         """Constructs a dictionary from OPS XML data.
         """
+        title = self._search(xml_data, 'title')
+        author = self._author(self._search(xml_data, 'creator'))
+        isbn = self._isbn(self._search(xml_data, 'identifier', 'isbn'))
+        if isbn is None:
+            isbn = ''
+        if author is None or title is None:
+            raise Exception("Required metadata is missing.")
         return {
-            'title': self._search(xml_data, 'title') or '',
-            'author': self._author(self._search(xml_data, 'creator') or ''),
-            'isbn': self._isbn(self._search(xml_data, 'identifier', 'isbn') or '')
+            'title': title,
+            'author': author,
+            'isbn': isbn
         }

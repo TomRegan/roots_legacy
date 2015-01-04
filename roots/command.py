@@ -68,7 +68,7 @@ Synopsis: Queries the library.
 
 Options:
   -a  Show a list of matching authors.
-  -i  Shou the ISBN number of each title.
+  -i  Show the ISBN number of each title.
   -t  Print the matches in a table.
 
 Examples:
@@ -188,8 +188,7 @@ Examples:
         self._configuration = configuration
         self._commands = {n.lower(): c
                           for n, c in getmembers(modules[__name__], isclass)
-                          if n is not self.name
-                          and n not in ['BaseCommand', 'EpubFormat']}
+                          if n not in ['BaseCommand', 'EpubFormat', 'Texttable']}
 
     def do(self):
         """Prints documentation for the command.
@@ -259,8 +258,9 @@ Synopsis: Updates the library.
                 if filename.endswith(".epub"):
                     srcpath = join(basepath, filename)
                     books.append(EpubFormat(self._configuration).load(srcpath))
-        library.store(self._configuration, books)
         count = len(books)
+        if count > 0:
+            library.store(self._configuration, books)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
 
@@ -277,6 +277,7 @@ Examples:
     def __init__(self, arguments, configuration):
         self._arguments = arguments
         self._configuration = configuration
+        self._term = configuration['terminal']
 
     def do(self):
         """Imports new e-books.
@@ -289,7 +290,8 @@ Examples:
             raise Exception('Cannot open library: %s', directory)
         moves, books = self._consider_moves()
         count = self._move_to_library(moves)
-        library.store(self._configuration, books)
+        if count > 0:
+            library.store(self._configuration, books)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
     def _consider_moves(self):
@@ -299,19 +301,26 @@ Examples:
         moves, books = [], []
         for basepath, _, filenames in walk(self._arguments['<path>']):
             for filename in filenames:
-                if not filename.endswith(".epub"):
+                try:
+                    if not filename.lower().endswith(".epub"):
+                        continue
+                    srcpath = join(basepath, filename)
+                    book = EpubFormat(self._configuration).load(srcpath)
+                    if book is None:
+                        continue
+                    destination_dir = join(library, self._clean_path(
+                        book['author']))
+                    destination_file = self._clean_path(
+                        book['title'] + '.epub')
+                except Exception, e:
+                    if len(e.args) > 0:
+                        self._term.warn("Not importing %s because " +
+                                        e.args[0].lower(), srcpath)
                     continue
-                srcpath = join(basepath, filename)
-                book = EpubFormat(self._configuration).load(srcpath)
-                if book is None:
-                    continue
-                destination_dir = join(library, self._clean_path(
-                    book['author']))
-                destination_file = self._clean_path(
-                    book['title'] + '.epub')
                 destpath = join(destination_dir, destination_file)
                 moves.append((srcpath, destpath, destination_dir))
                 books.append(book)
+        self._term.debug('_consider_moves() -> %s %s', moves, books)
         return moves, books
 
     def _clean_path(self, srcpath):
@@ -326,25 +335,25 @@ Examples:
     def _move_to_library(self, moves, move=_copy):
         """Move files to the library
         """
-        terminal = self._configuration['terminal']
         count = 0
         for srcpath, destpath, destination_dir in moves:
             try:
                 if not exists(destination_dir):
                     makedirs(destination_dir)
             except OSError:
-                terminal.warn("Error creating path %s", destination_dir)
+                self._term.warn("Error creating path %s", destination_dir)
                 continue
             overwrite = self._configuration['import']['overwrite']
             if not overwrite and isfile(destpath):
-                terminal.warn("Not importing %s because it already exists "
+                self._term.warn("Not importing %s because it already exists "
                               "in the library.", srcpath)
                 continue
             print "%s ->\n%s" % (basename(srcpath), destpath)
             try:
                 move(srcpath, destpath)
                 count += 1
-            except IOError, ioerror:
-                terminal.warn("Error copying %s (%s)", srcpath, ioerror.errno)
+            except IOError, ioe:
+                self._term.warn("Error copying %s (%s)", srcpath, ioe.errno)
                 continue
+        self._term.debug('_move_to_library() -> %d', count)
         return count

@@ -49,21 +49,23 @@ from format import EpubFormat
 class Terminal(blessings.Terminal):
     """Allows interaction with the terminal.
     """
+
+    def _prefmt(self, pre, colour):
+        return self.underline + colour + pre + self.normal + ": "
+
     def warn(self, msg, *args):
         """Write a warning message to the terminal.
         """
-        line_length = sum(len(x) for x in args)
-        fmt = ''
-        for word in msg.split():
-            line_length += len(word)
-            if line_length + len(word) > self.width:
-                fmt += '\n' + word + ' '
-                line_length = 0
-            else:
-                fmt += word + ' '
-        print (self.yellow +
-               fmt.replace('%s', "'" + self.blue + "%s" + self.yellow + "'") +
-               self.normal) % args
+        replace_fmt = "'" + self.red + "%s" + self.normal +  "'"
+        print (self._prefmt('Error', self.red)
+               + msg.replace('%s', replace_fmt)
+               + self.normal) % args
+
+    def debug(self, msg, *args):
+        """Write a debug message to the terminal.
+        """
+        if False:
+            print (self._prefmt('Debug', self.blue) + msg) % args
 
 
 def do_command(arguments, configuration):
@@ -74,7 +76,10 @@ def do_command(arguments, configuration):
     try:
         cmd.do()
     except Exception, e:
-        term.warn(e.args[0], *e.args[1:])
+        if len(e.args) > 0:
+            term.warn(e.args[0], *e.args[1:])
+        else:
+            term.warn("Unknown error")
 
 
 def main():

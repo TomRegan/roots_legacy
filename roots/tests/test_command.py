@@ -26,6 +26,7 @@ class CommandTest(unittest.TestCase):
 
     def test_import_normalisation(self):
         c = default_configuration()
+        c['terminal'] = None
         compile_regex(c)
         cls = Import({}, c)
         [self.assertEqual(cls._clean_path(i), e) for e, i in

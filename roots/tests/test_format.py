@@ -28,6 +28,8 @@ class FormatTest(unittest.TestCase):
         cls = BaseFormat()
         self.assertEqual("Foo Bar", cls._author("Bar, Foo"))
         self.assertEqual("Eggs Spam", cls._author("Spam, Eggs"))
+        self.assertEquals(None, cls._author(''))
+        self.assertEquals(None, cls._author(None))
 
 
     def test_isbn_determination(self):
@@ -43,7 +45,8 @@ class FormatTest(unittest.TestCase):
              (None, '1'),  # too short
              (None, "01234567891234"),  # too long
              (None, "0a23456789123"),  # contains letters
-             (None, "0123456789123")  # not a valid isbn
+             (None, "0123456789123"),  # not a valid isbn
+             (None, None)
          ]
         ]
 
