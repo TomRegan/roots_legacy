@@ -28,6 +28,8 @@ class FormatTest(unittest.TestCase):
         cls = BaseFormat()
         self.assertEqual("Foo Bar", cls._author("Bar, Foo"))
         self.assertEqual("Eggs Spam", cls._author("Spam, Eggs"))
+        self.assertEqual("Arthur C. Clarke", cls._author("Arthur C. Clarke"))
+        self.assertEqual("Arthur C. Clarke", cls._author("Clarke, Arthur C."))
         self.assertEquals(None, cls._author(''))
         self.assertEquals(None, cls._author(None))
 

@@ -21,7 +21,7 @@ from os.path import join, isfile, exists, basename
 from os import walk, makedirs
 from sys import modules
 from inspect import isclass, getmembers
-from shutil import copy2 as _copy
+from shutil import copy2 as _copy, move as _move
 from texttable import Texttable
 
 import yaml
@@ -89,7 +89,7 @@ Examples:
     def do(self):
         """Loads the library metadata and selects entries from it.
         """
-        books = library.load(self._configuration)
+        books = library.load(self._configuration)['library']
         restrict, select = self._parse_query()
         if select is None:
             results = [(book['author'], book['title'], book['isbn'])
@@ -289,7 +289,11 @@ Examples:
         if not exists(directory):
             raise Exception('Cannot open library: %s', directory)
         moves, books = self._consider_moves()
-        count = self._move_to_library(moves)
+        if self._configuration['import']['move']:
+            move = _move
+        else:
+            move = _copy
+        count = self._move_to_library(moves, move=move)
         if count > 0:
             library.store(self._configuration, {'library': books})
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
@@ -315,7 +319,7 @@ Examples:
                 except Exception, e:
                     if len(e.args) > 0:
                         self._term.warn("Not importing %s because " +
-                                        e.args[0].lower(), srcpath)
+                                        str(e.args[0]).lower(), srcpath)
                     continue
                 destpath = join(destination_dir, destination_file)
                 moves.append((srcpath, destpath, destination_dir))

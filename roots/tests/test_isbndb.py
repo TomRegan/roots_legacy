@@ -278,7 +278,7 @@ class TestIsbndb(unittest.TestCase):
             'configpath': tempfile.mkdtemp()
         },
         'library': 'library.db',
-        'terminal': Terminal()
+        'terminal': Terminal({'debug': False})
     }
 
 

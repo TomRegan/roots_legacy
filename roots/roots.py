@@ -50,6 +50,10 @@ class Terminal(blessings.Terminal):
     """Allows interaction with the terminal.
     """
 
+    def __init__(self, configuration):
+        super(Terminal, self).__init__()
+        self._configuration = configuration
+
     def _prefmt(self, pre, colour):
         return self.underline + colour + pre + self.normal + ": "
 
@@ -64,13 +68,13 @@ class Terminal(blessings.Terminal):
     def debug(self, msg, *args):
         """Write a debug message to the terminal.
         """
-        if False:
+        if self._configuration['debug']:
             print (self._prefmt('Debug', self.blue) + msg) % args
 
 
 def do_command(arguments, configuration):
     """TODO"""
-    term = Terminal()
+    term = Terminal(configuration)
     configuration['terminal'] = term
     cmd = command(arguments, configuration)
     try:
