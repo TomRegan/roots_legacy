@@ -18,12 +18,12 @@
 """
 
 from os.path import join, isfile
-from shutil import move
 import pickle
+import shelve
 
 
-def load(configuration):
-    """Returns a list of books in the library.
+def load(configuration, subject):
+    """Returns data from the library.
     """
     library_path = join(configuration['system']['configpath'],
                         configuration['library'])
@@ -31,34 +31,35 @@ def load(configuration):
                                     isfile(library_path))
     if not isfile(library_path):
         raise Exception('Cannot open library: %s', library_path)
-    with open(library_path, 'rb') as library_file:
-        db = pickle.load(library_file)
-    return db['library']
+    try:
+        library = shelve.open(library_path, flag='r')
+        if subject in library:
+            return library[subject]
+    finally:
+        library.close()
 
 
 def store(configuration, data):
-    """Stores a list of books in the library.
+    """Stores data in the library.
     """
     library_path = join(configuration['system']['configpath'],
                         configuration['library'])
     term = configuration['terminal']
-    term.debug('storing %s (exists: %s)', library_path,
-               isfile(library_path))
-    if isfile(library_path):
-        with open(library_path, 'rb+') as library_file:
-            try:
-                db = pickle.load(library_file)
-                for subject, entry in data.iteritems():
-                    db[subject] = entry
-                pickle.dump(db, library_file)
-            except:
-                backup_path = library_path + '.bak'
-                move(library_path, backup_path)
-                term.warn("The library may be corrupt. Created a back up of "
-                          "%s (%s). You may want to remove this backup "
-                          "file", library_path, backup_path)
-                store(configuration, data)
-    else:
-        with open(library_path, 'wb') as library_file:
-            db = {'version':'1', 'library': data}
-            pickle.dump(db, library_file)
+    term.debug('storing %s (exists: %s)', library_path, isfile(library_path))
+    if not isfile(library_path):
+        data['version'] = 1
+    library = shelve.open(library_path)
+    for subject, entry in data.iteritems():
+        library[subject] = entry
+    library.close()
+
+def update(configuration, subject, data, function):
+    """Updates data in the library.
+    """
+    try:
+        existing_data = load(configuration, subject)
+    except:
+        existing_data = None
+    if existing_data is not None:
+        data = function(data, existing_data)
+    store(configuration, {subject: data})

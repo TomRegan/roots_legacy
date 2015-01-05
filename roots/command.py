@@ -17,7 +17,7 @@
 """Commands.
 """
 
-from os.path import join, isfile, exists, basename
+from os.path import join, isfile, exists, basename, dirname
 from os import walk, makedirs
 from sys import modules
 from inspect import isclass, getmembers
@@ -89,7 +89,7 @@ Examples:
     def do(self):
         """Loads the library metadata and selects entries from it.
         """
-        books = library.load(self._configuration)['library']
+        books = library.load(self._configuration, 'library')
         restrict, select = self._parse_query()
         if select is None:
             results = [(book['author'], book['title'], book['isbn'])
@@ -164,7 +164,7 @@ Synopsis: Shows fields that can be used in queries.
         self._configuration = configuration
 
     def do(self):
-        books = library.load(self._configuration)
+        books = library.load(self._configuration, 'library')
         fields = set()
         for book in books:
             for field in book.keys():
@@ -295,7 +295,8 @@ Examples:
             move = _copy
         count = self._move_to_library(moves, move=move)
         if count > 0:
-            library.store(self._configuration, {'library': books})
+            library.update(self._configuration, 'library', books,
+                           lambda x, y: x + y)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
 
     def _consider_moves(self):
@@ -322,8 +323,14 @@ Examples:
                                         str(e.args[0]).lower(), srcpath)
                     continue
                 destpath = join(destination_dir, destination_file)
-                moves.append((srcpath, destpath, destination_dir))
-                books.append(book)
+                overwrite = self._configuration['import']['overwrite']
+                if not overwrite and isfile(destpath):
+                    self._term.warn("Not importing %s because it already "
+                                    "exists in the library.", srcpath)
+                    continue
+                if srcpath != destpath:
+                    moves.append((srcpath, destpath))
+                    books.append(book)
         self._term.debug('_consider_moves() -> %s %s', moves, books)
         return moves, books
 
@@ -339,25 +346,20 @@ Examples:
     def _move_to_library(self, moves, move=_copy):
         """Move files to the library
         """
-        count = 0
-        for srcpath, destpath, destination_dir in moves:
+        moved = 0
+        for srcpath, destpath in moves:
+            destdir = dirname(destpath)
             try:
-                if not exists(destination_dir):
-                    makedirs(destination_dir)
+                if not exists(destdir):
+                    makedirs(destdir)
             except OSError:
-                self._term.warn("Error creating path %s", destination_dir)
-                continue
-            overwrite = self._configuration['import']['overwrite']
-            if not overwrite and isfile(destpath):
-                self._term.warn("Not importing %s because it already exists "
-                              "in the library.", srcpath)
+                self._term.warn("Error creating path %s", destdir)
                 continue
             print "%s ->\n%s" % (basename(srcpath), destpath)
             try:
                 move(srcpath, destpath)
-                count += 1
+                moved += 1
             except IOError, ioe:
-                self._term.warn("Error copying %s (%s)", srcpath, ioe.errno)
-                continue
-        self._term.debug('_move_to_library() -> %d', count)
-        return count
+                self._term.warn("Error importing %s (%s)", srcpath, ioe.errno)
+        self._term.debug('_move_to_library() -> %d', moved)
+        return moved

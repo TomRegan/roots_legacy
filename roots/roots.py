@@ -61,9 +61,12 @@ class Terminal(blessings.Terminal):
         """Write a warning message to the terminal.
         """
         replace_fmt = "'" + self.red + "%s" + self.normal +  "'"
-        print (self._prefmt('Error', self.red)
-               + msg.replace('%s', replace_fmt)
-               + self.normal) % args
+        if '%s' in str(msg):
+            print (self._prefmt('Error', self.red)
+                   + str(msg).replace('%s', replace_fmt)
+                   + self.normal) % args
+        else:
+            print self._prefmt('Error', self.red) + str(msg)
 
     def debug(self, msg, *args):
         """Write a debug message to the terminal.

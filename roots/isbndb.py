@@ -41,8 +41,8 @@ class Request(object):
         books.
         """
         try:
-            db = library.load(self._configuration)
-            rate = db['isbndb']['rate']
+            db = library.load(self._configuration, 'isbndb')
+            rate = db['rate']
         except:
             rate = self._configuration['isbndb']['rate']
             if rate is not None:
@@ -57,11 +57,11 @@ class Request(object):
                 if rate > 0:
                     rate -= 1
                 else:
-                    raise Exception("Calls to ISBNDB are throttled. Check the configuration.")
+                    raise Exception("Calls to ISBNDB are throttled. "
+                                    "Check the configuration.")
             request = '%s/book/%s' % (request_base, book['isbn'])
             r = requests.get(request)
             response = yaml.load(r.text)
-            # it doesn't need doing properly yet!
             if 'data' not in response.keys():
                 request = '%s/book/%s' % (
                     request_base, book['title'].replace(' ', '_').lower()
