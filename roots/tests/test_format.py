@@ -32,6 +32,10 @@ class FormatTest(unittest.TestCase):
         self.assertEqual("Arthur C. Clarke", cls._author("Clarke, Arthur C."))
         self.assertEquals(None, cls._author(''))
         self.assertEquals(None, cls._author(None))
+        self.assertEquals("Bob and Vic", cls._author("Bob; Vic"))
+        self.assertEquals("Bob and Vic", cls._author("Vic; Bob"))
+        self.assertEquals("Bob, Rita and Sue", cls._author("Rita; Sue; Bob"))
+        self.assertEquals("Foo Bar and Eggs Spam", cls._author("Bar, Foo; Spam, Eggs"))
 
 
     def test_isbn_determination(self):

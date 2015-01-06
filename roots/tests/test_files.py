@@ -13,23 +13,23 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-"""Command unit tests.
+
+"""Files unit tests.
 """
 
 import unittest
 
 from roots.configuration import default_configuration, compile_regex
-from roots.command import Import
+from roots.files import clean_path
 
 
-class CommandTest(unittest.TestCase):
+class FilesTest(unittest.TestCase):
 
     def test_import_normalisation(self):
         c = default_configuration()
         c['terminal'] = None
         compile_regex(c)
-        cls = Import({}, c)
-        [self.assertEqual(cls._clean_path(i), e) for e, i in
+        [self.assertEqual(clean_path(c, i), e) for e, i in
          [
              ("Space_ The Final Frontier", "Space: The Final Frontier"),
              ("Spaces, The Final Frontier", "Spaces, The Final Frontier   "),

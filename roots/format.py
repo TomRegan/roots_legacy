@@ -38,10 +38,22 @@ class BaseFormat(object):
         """
         if string is None or len(string) == 0:
             return None
-        name = string.split(',')
-        if len(name) == 1:
-            return string
-        return ' '.join([name[1], name[0]]).strip()
+        names = sorted({x.strip() for x in string.split(';')})
+        authors = self._reverse_csv_list(names)
+        init, last = authors[:-1], authors[-1]
+        if len(init) != 0:
+            return ', '.join(init) + ' and ' + last
+        return last
+
+    def _reverse_csv_list(self, list):
+        """If elements in a list are comma separated, and the comma
+        is removed they are reversed, otherwise they are unchanged.
+        ['b, a', 'c d'] -> ['a b', 'c d']
+        """
+        return [' '.join([first.strip(), last.strip()])
+                if first is not None else last for (last, first) in
+                [name.split(',') if len(name.split(',')) == 2 else (name, None)
+                 for name in list]]
 
     def _isbn(self, number):
         """Return an ISBN given a (possibly malformed) string.
