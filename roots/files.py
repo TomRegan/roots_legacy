@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# Copyright 2014 Tom Regan
+# Copyright 2015 Tom Regan
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,8 +38,9 @@ def find_moves(configuration, srcpath):
                 book = EpubFormat(configuration).load(srcpath)
                 if book is None:
                     continue
-                dstdir = join(library, clean_path(configuration, book['author']))
-                dstfile = clean_path(configuration, book['title'] + '.epub')
+                dstdir = join(library, _clean_path(configuration,
+                                                   book['author']))
+                dstfile = _clean_path(configuration, book['title'] + '.epub')
             except Exception, e:
                 if len(e.args) > 0:
                     terminal.warn("Not importing %s because " +
@@ -57,7 +58,7 @@ def find_moves(configuration, srcpath):
     terminal.debug('_consider_moves() -> %s %s', moves, books)
     return moves, books
 
-def clean_path(configuration, srcpath):
+def _clean_path(configuration, srcpath):
     """Takes a path (as a Unicode string) and makes sure that it is
     legal.
     """
