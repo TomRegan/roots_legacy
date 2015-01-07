@@ -23,13 +23,13 @@ from shutil import copy2 as _copy, move as _move
 from format import EpubFormat
 
 
-def find_moves(configuration, srcpath):
+def find_moves(configuration, rootpath):
     """Determines the files to be moved and their destinations.
     """
     library = configuration['directory']
     terminal = configuration['terminal']
     moves, books = [], []
-    for basepath, _, filenames in walk(srcpath):
+    for basepath, _, filenames in walk(rootpath):
         for filename in filenames:
             try:
                 if not filename.lower().endswith(".epub"):
@@ -48,14 +48,19 @@ def find_moves(configuration, srcpath):
                 continue
             dstpath = join(dstdir, dstfile)
             overwrite = configuration['import']['overwrite']
-            if not overwrite and isfile(dstpath):
+            if rootpath != library and not overwrite and isfile(dstpath):
                 terminal.warn("Not importing %s because it already "
                               "exists in the library.", srcpath)
                 continue
-            if srcpath != dstpath:
+            # if Update, all books, moves if path is wrong
+            if rootpath == library:
+                if srcpath.decode('utf-8') != dstpath.decode('utf-8'):
+                    moves.append((srcpath, dstpath))
+                books.append(book)
+            # if Import, all new books and moves
+            elif srcpath.decode('utf-8') != dstpath.decode('utf-8'):
                 moves.append((srcpath, dstpath))
                 books.append(book)
-    terminal.debug('_consider_moves() -> %s %s', moves, books)
     return moves, books
 
 def _clean_path(configuration, srcpath):
@@ -65,7 +70,7 @@ def _clean_path(configuration, srcpath):
     replacements = configuration['import']['replacements']
     for expression, replacement in replacements.iteritems():
         srcpath = expression.sub(replacement, srcpath)
-    return srcpath
+    return srcpath.encode('utf-8')
 
 def move_to_library(configuration, moves, move=_copy):
     """Move files to the library

@@ -20,7 +20,7 @@
 import unittest
 
 from roots.configuration import default_configuration, compile_regex
-from roots.files import clean_path
+from roots.files import _clean_path
 
 
 class FilesTest(unittest.TestCase):
@@ -29,7 +29,7 @@ class FilesTest(unittest.TestCase):
         c = default_configuration()
         c['terminal'] = None
         compile_regex(c)
-        [self.assertEqual(clean_path(c, i), e) for e, i in
+        [self.assertEqual(_clean_path(c, i), e) for e, i in
          [
              ("Space_ The Final Frontier", "Space: The Final Frontier"),
              ("Spaces, The Final Frontier", "Spaces, The Final Frontier   "),

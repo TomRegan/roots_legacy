@@ -256,15 +256,17 @@ class Update(BaseCommand):
         directory = self._configuration['directory']
         if not exists(directory):
             raise Exception('Cannot open library: %s', directory)
-        for basepath, _, filenames in walk(directory):
-            for filename in filenames:
-                if filename.endswith(".epub"):
-                    srcpath = join(basepath, filename)
-                    books.append(EpubFormat(self._configuration).load(srcpath))
-        count = len(books)
-        if count > 0:
+        moves, books = files.find_moves(self._configuration, directory)
+        if self._configuration['import']['move']:
+            moved = files.move_to_library(self._configuration, moves)
+        else:
+            moved = 0
+        found = len(books)
+        if found > 0:
             library.store(self._configuration, {'library': books})
-        print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
+        print 'Updated %d %s, moved %d.' % (
+            found, found != 1 and 'books' or 'book', moved
+        )
 
 
 class Import(BaseCommand):

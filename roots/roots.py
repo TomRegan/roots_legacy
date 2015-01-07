@@ -40,6 +40,7 @@ Options:
 import blessings
 
 from docopt import docopt
+from traceback import print_exc
 
 from command import command
 from configuration import user_configuration, compile_regex
@@ -87,6 +88,7 @@ def do_command(arguments, configuration):
             term.warn(e.args[0], *e.args[1:])
         else:
             term.warn("Unknown error")
+        print_exc(e)
 
 
 def main():
