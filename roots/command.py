@@ -17,10 +17,10 @@
 """Commands.
 """
 
-from os.path import join, isfile, exists, basename, dirname
-from os import walk, makedirs
-from sys import modules
-from inspect import isclass, getmembers
+from os.path import join, isfile, exists
+from os import walk
+
+from inspect import getdoc
 
 from texttable import Texttable
 
@@ -59,29 +59,29 @@ class BaseCommand(object):
 
     @property
     def help(self):
-        return self.__doc__
+        return getdoc(self)
 
 
 class List(BaseCommand):
 
     """Usage: root list [-ait] [<query>]...
-Synopsis: Queries the library.
+    Synopsis: Queries the library.
 
-Options:
-  -a  Show a list of matching authors.
-  -i  Show the ISBN number of each title.
-  -t  Print the matches in a table.
+    Options:
+      -a  Show a list of matching authors.
+      -i  Show the ISBN number of each title.
+      -t  Print the matches in a table.
 
-Examples:
-  root list author:forster
-    -> All titles by Forster.
+    Examples:
+      root list author:forster
+        -> All titles by Forster.
 
-  root list -a howards end
-    -> All authors of matching titles.
+      root list -a howards end
+        -> All authors of matching titles.
 
-  root list -i
-    -> All known titles with ISBNs.
-"""
+      root list -i
+        -> All known titles with ISBNs.
+    """
 
     def __init__(self, arguments, configuration):
         self._arguments = arguments
@@ -147,7 +147,8 @@ Examples:
         table.set_cols_dtype(header_type)
         table.header(header)
         for author, title, isbn in results:
-            if isbn is None: isbn = ""
+            if isbn is None:
+                isbn = ""
             row = [author.encode('utf-8'), title.encode('utf-8')]
             if self._configuration['list']['isbn'] or self._arguments['-i']:
                 row += [isbn.encode('utf-8')]
@@ -158,8 +159,8 @@ Examples:
 class Fields(BaseCommand):
 
     """Usage: root fields
-Synopsis: Shows fields that can be used in queries.
-"""
+    Synopsis: Shows fields that can be used in queries.
+    """
 
     def __init__(self, arguments, configuration):
         self._configuration = configuration
@@ -177,19 +178,20 @@ Synopsis: Shows fields that can be used in queries.
 class Help(BaseCommand):
 
     """Usage: root help [%s]
-Synopsis: Shows help for a command.
+    Synopsis: Shows help for a command.
 
-Examples:
-  root help list
-    -> Shows help for the list command.
-"""
+    Examples:
+      root help list
+        -> Shows help for the list command.
+    """
 
     def __init__(self, arguments, configuration):
         self._arguments = arguments
         self._configuration = configuration
-        self._commands = {n.lower(): c
-                          for n, c in getmembers(modules[__name__], isclass)
-                          if n not in ['BaseCommand', 'EpubFormat', 'Texttable']}
+        self._commands = {
+            command.__name__.lower(): command
+            for command in BaseCommand.__subclasses__()
+        }
 
     def do(self):
         """Prints documentation for the command.
@@ -206,18 +208,18 @@ Examples:
     def help(self):
         """Returns help string.
         """
-        return self.__doc__ % ' | '.join(self._commands.keys())
+        return getdoc(self) % ' | '.join(sorted(self._commands.keys()))
 
 
 class Config(BaseCommand):
 
     """Usage: root config [-p | --path | -d | --default]
-Synopsis: Shows the configuration.
+    Synopsis: Shows the configuration.
 
-Options:
-  -p,--path     Display the configuration file path.
-  -d,--default  Display configuration defaults.
-"""
+    Options:
+      -p,--path     Display the configuration file path.
+      -d,--default  Display configuration defaults.
+    """
 
     def __init__(self, arguments, configuration):
         self._configuration = configuration
@@ -240,8 +242,8 @@ Options:
 class Update(BaseCommand):
 
     """Usage: root update
-Synopsis: Updates the library.
-"""
+    Synopsis: Updates the library.
+    """
 
     def __init__(self, arguments, configuration):
         self._arguments = arguments
@@ -268,12 +270,12 @@ Synopsis: Updates the library.
 class Import(BaseCommand):
 
     """Usage: root import <path>
-Synopsis: Imports new e-books.
+    Synopsis: Imports new e-books.
 
-Examples:
-  root import ~/Downloads/
-    -> imports books from ~/Downloads/
-"""
+    Examples:
+      root import ~/Downloads/
+        -> imports books from ~/Downloads/
+    """
 
     def __init__(self, arguments, configuration):
         self._arguments = arguments
