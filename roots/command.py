@@ -53,6 +53,10 @@ class BaseCommand(object):
 
     """Base command class.
     """
+    def __init__(self, arguments, configuration):
+        self._arguments = arguments
+        self._configuration = configuration
+
     @property
     def name(self):
         return self.__class__.__name__
@@ -82,10 +86,6 @@ class List(BaseCommand):
       root list -i
         -> All known titles with ISBNs.
     """
-
-    def __init__(self, arguments, configuration):
-        self._arguments = arguments
-        self._configuration = configuration
 
     def do(self):
         """Loads the library metadata and selects entries from it.
@@ -162,9 +162,6 @@ class Fields(BaseCommand):
     Synopsis: Shows fields that can be used in queries.
     """
 
-    def __init__(self, arguments, configuration):
-        self._configuration = configuration
-
     def do(self):
         books = library.load(self._configuration, 'library')
         fields = set()
@@ -186,8 +183,7 @@ class Help(BaseCommand):
     """
 
     def __init__(self, arguments, configuration):
-        self._arguments = arguments
-        self._configuration = configuration
+        super(Help, self).__init__(arguments, configuration)
         self._commands = {
             command.__name__.lower(): command
             for command in BaseCommand.__subclasses__()
@@ -221,10 +217,6 @@ class Config(BaseCommand):
       -d,--default  Display configuration defaults.
     """
 
-    def __init__(self, arguments, configuration):
-        self._configuration = configuration
-        self._arguments = arguments
-
     def do(self):
         """Prints configuration.
         """
@@ -244,10 +236,6 @@ class Update(BaseCommand):
     """Usage: root update
     Synopsis: Updates the library.
     """
-
-    def __init__(self, arguments, configuration):
-        self._arguments = arguments
-        self._configuration = configuration
 
     def do(self):
         """Updates the library.
@@ -278,10 +266,6 @@ class Import(BaseCommand):
       root import ~/Downloads/
         -> imports books from ~/Downloads/
     """
-
-    def __init__(self, arguments, configuration):
-        self._arguments = arguments
-        self._configuration = configuration
 
     def do(self):
         """Imports new e-books.
