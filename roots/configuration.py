@@ -40,7 +40,8 @@ def default_configuration():
             },
             'overwrite': False,
             'hash': False,
-            'move': False
+            'move': False,
+            'prune': True
         },
         'isbndb' : {
             'key' : None,

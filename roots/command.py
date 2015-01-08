@@ -18,12 +18,8 @@
 """
 
 from os.path import join, isfile, exists
-from os import walk
-
 from inspect import getdoc
-
 from texttable import Texttable
-
 import yaml
 
 from configuration import user_configuration, default_configuration
@@ -245,13 +241,15 @@ class Update(BaseCommand):
         if not exists(directory):
             raise Exception('Cannot open library: %s', directory)
         moves, books = files.find_moves(self._configuration, directory)
+        moved = 0
         if self._configuration['import']['move']:
             moved = files.move_to_library(self._configuration, moves)
-        else:
-            moved = 0
+            if self._configuration['import']['prune']:
+                files.prune(self._configuration)
         found = len(books)
         if found > 0:
             library.store(self._configuration, {'library': books})
+
         print 'Updated %d %s, moved %d.' % (
             found, found != 1 and 'books' or 'book', moved
         )

@@ -17,8 +17,8 @@
 """File operations.
 """
 
-from os import walk, makedirs
-from os.path import join, isfile, dirname, basename, exists
+from os import walk, makedirs, rmdir
+from os.path import join, isfile, dirname, basename, exists, normpath, samefile
 from shutil import copy2 as _copy, move as _move
 from format import EpubFormat
 
@@ -38,8 +38,7 @@ def find_moves(configuration, rootpath):
                 book = EpubFormat(configuration).load(srcpath)
                 if book is None:
                     continue
-                dstdir = join(library, _clean_path(configuration,
-                                                   book['author']))
+                dstdir = join(library, _clean_path(configuration, book['author']))
                 dstfile = _clean_path(configuration, book['title'] + '.epub')
             except Exception, e:
                 if len(e.args) > 0:
@@ -53,12 +52,12 @@ def find_moves(configuration, rootpath):
                               "exists in the library.", srcpath)
                 continue
             # if Update, all books, moves if path is wrong
-            if rootpath == library:
-                if srcpath.decode('utf-8') != dstpath.decode('utf-8'):
+            if samefile(rootpath, library):
+                if not samefile(srcpath, dstpath):
                     moves.append((srcpath, dstpath))
                 books.append(book)
             # if Import, all new books and moves
-            elif srcpath.decode('utf-8') != dstpath.decode('utf-8'):
+            elif not samefile(srcpath, dstpath):
                 moves.append((srcpath, dstpath))
                 books.append(book)
     return moves, books
@@ -97,3 +96,11 @@ def move_to_library(configuration, moves, move=_copy):
             terminal.warn("Error importing %s (%s)", srcpath, ioe.errno)
     terminal.debug('_move_to_library() -> %d', moved)
     return moved
+
+def prune(configuration):
+    """Removes empty directories
+    """
+    for basepath, dirnames, filenames in walk(configuration['directory'],
+                                              topdown=False):
+        if len(dirnames) == 0 and len(filenames) == 0:
+            rmdir(basepath)
