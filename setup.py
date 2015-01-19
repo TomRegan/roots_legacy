@@ -10,8 +10,19 @@ setup(name='roots',
       url='https://github.com/TomRegan/roots',
       license="http://www.apache.org/licenses/LICENSE-2.0",
       packages=['roots', 'roots.tests'],
+      install_requires=[
+          'pyyaml==3.11',
+          'blessings==1.6',
+          'docopt==0.6.2',
+          'mkdocs==0.11.1',
+          'requests==2.5.0',
+          'texttable==0.8.1',
+          # Tests
+          'nose==1.3.4',
+          'responses==0.3.0'
+      ],
       entry_points={
           'console_scripts': [
               'root = roots.roots:main',
           ]}
-     )
+)
