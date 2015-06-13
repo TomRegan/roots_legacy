@@ -24,7 +24,8 @@ import yaml
 
 from configuration import user_configuration, default_configuration
 from format import EpubFormat
-import library
+from isbndb import Request
+import storage
 import files
 
 
@@ -43,6 +44,8 @@ def command(arguments, configuration):
         return Help(arguments, configuration)
     elif arguments['fields']:
         return Fields(arguments, configuration)
+    elif arguments['test']:
+        return Test(arguments, configuration)
 
 
 class BaseCommand(object):
@@ -60,6 +63,25 @@ class BaseCommand(object):
     @property
     def help(self):
         return getdoc(self)
+
+
+#TODO move into a separate module
+def books_as_tuple(configuration, restrict='title', select=None):
+    return [(book['author'], book['title'], book['isbn'])
+            for book in _query(configuration, restrict, select)]
+
+def books_as_map(configuration, restrict='title', select=None):
+    return _query(configuration, restrict, select)
+
+def _query(configuration, restrict='title', select=None):
+    books = storage.load(configuration, 'library')
+    if select is None:
+        return books
+    else:
+        return [book for book in books
+                if restrict in book.keys()
+                and select.upper()
+                in unicode(book[restrict]).upper()]
 
 
 class List(BaseCommand):
@@ -86,17 +108,9 @@ class List(BaseCommand):
     def do(self):
         """Loads the library metadata and selects entries from it.
         """
-        books = library.load(self._configuration, 'library')
+
         restrict, select = self._parse_query()
-        if select is None:
-            results = [(book['author'], book['title'], book['isbn'])
-                       for book in books]
-        else:
-            results = [(book['author'], book['title'], book['isbn'])
-                       for book in books
-                       if restrict in book.keys()
-                       and select.upper()
-                       in unicode(book[restrict]).upper()]
+        results = books_as_tuple(self._configuration, restrict, select)
         if len(results) == 0:
             raise Exception("No matches for %s.", select)
         elif self._configuration['list']['table'] or self._arguments['-t']:
@@ -107,13 +121,13 @@ class List(BaseCommand):
     def _parse_query(self):
         """Extract select and restrict operations from the query.
         """
-        query = self._arguments['<query>']
-        if query:
-            if ':' in query[0]:
-                restrict, select = query[0].split(':')
-                return restrict, ' '.join([select] + query[1:])
+        user_query = self._arguments['<query>']
+        if user_query:
+            if ':' in user_query[0]:
+                restrict, select = user_query[0].split(':')
+                return restrict, ' '.join([select] + user_query[1:])
             else:
-                return 'title', ' '.join(query)
+                return 'title', ' '.join(user_query)
         return None, None
 
     def _print_results(self, results):
@@ -159,7 +173,7 @@ class Fields(BaseCommand):
     """
 
     def do(self):
-        books = library.load(self._configuration, 'library')
+        books = storage.load(self._configuration, 'library')
         fields = set()
         for book in books:
             for field in book.keys():
@@ -248,7 +262,7 @@ class Update(BaseCommand):
                 files.prune(self._configuration)
         found = len(books)
         if found > 0:
-            library.store(self._configuration, {'library': books})
+            storage.store(self._configuration, {'library': books})
 
         print 'Updated %d %s, moved %d.' % (
             found, found != 1 and 'books' or 'book', moved
@@ -278,6 +292,34 @@ class Import(BaseCommand):
                                         self._arguments['<path>'])
         count = files.move_to_library(self._configuration, moves)
         if count > 0:
-            library.update(self._configuration, 'library', books,
+            storage.update(self._configuration, 'library', books,
                            lambda x, y: x + y)
         print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
+
+class Test(BaseCommand):
+
+    """Usage: root test [<query>]...
+    Synopsis: Test the isbndb command.
+    """
+
+    def do(self):
+        """Tests the ISBNDB command
+        """
+        restrict, select = self._parse_query()
+        books = books_as_map(self._configuration, restrict, select)
+        request = Request(self._configuration)
+        print books
+        books = request.request(books)
+        print books
+
+    def _parse_query(self):
+        """Extract select and restrict operations from the query.
+        """
+        user_query = self._arguments['<query>']
+        if user_query:
+            if ':' in user_query[0]:
+                restrict, select = user_query[0].split(':')
+                return restrict, ' '.join([select] + user_query[1:])
+            else:
+                return 'title', ' '.join(user_query)
+        return None, None

@@ -21,6 +21,7 @@ Usage:
   root list [-ait] [<query>]...
   root fields
   root config [-p | -d | --path | --default]
+  root test [<query>]...
   root help <command>
   root (-h | --help | --version)
 
@@ -30,6 +31,7 @@ Commands:
   list       Query the library.
   fields     Show fields that can be used in queries.
   config     Show the configuration.
+  test       Test the new feature
   help       Show help for a sub-command.
 
 Options:

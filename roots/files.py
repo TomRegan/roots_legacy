@@ -75,10 +75,10 @@ def move_to_library(configuration, moves, move=_copy):
     """Move files to the library
     """
     terminal = configuration['terminal']
-    move = {
-        True: _move,
-        False: _copy
-    }[configuration['import']['move']]
+    if [configuration['import']['move']]:
+        move = _move
+    else:
+        move = _copy
     moved = 0
     for srcpath, destpath in moves:
         destdir = dirname(destpath)

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Classes for interracting with the library.
+"""Classes for interacting with the isbndb web service.
 """
 
 import yaml
@@ -22,7 +22,7 @@ import requests
 
 from string import digits
 
-import library
+import storage
 
 
 class Request(object):
@@ -34,6 +34,8 @@ class Request(object):
 
     def __init__(self, configuration):
         self._configuration = configuration
+        api_key = configuration['isbndb']['key']
+        self._request_base = 'http://isbndb.com/api/v2/yaml/' + api_key
         self._term = configuration['terminal']
 
     def request(self, books):
@@ -41,7 +43,7 @@ class Request(object):
         books.
         """
         try:
-            db = library.load(self._configuration, 'isbndb')
+            db = storage.load(self._configuration, 'isbndb')
             rate = db['rate']
         except:
             rate = self._configuration['isbndb']['rate']
@@ -50,8 +52,7 @@ class Request(object):
             else:
                 self._term.debug('ISBNDB requests not limited.')
         results = []
-        api_key = self._configuration['isbndb']['key']
-        request_base = 'http://isbndb.com/api/v2/yaml/' + api_key
+
         for book in books:
             if rate is not None:
                 if rate > 0:
@@ -59,18 +60,14 @@ class Request(object):
                 else:
                     raise Exception("Calls to ISBNDB are throttled. "
                                     "Check the configuration.")
-            request = '%s/book/%s' % (request_base, book['isbn'])
-            r = requests.get(request)
-            response = yaml.load(r.text)
-            if 'data' not in response.keys():
-                request = '%s/book/%s' % (
-                    request_base, book['title'].replace(' ', '_').lower()
-                )
-                r = requests.get(request)
-                response = yaml.load(r.text)
-                if 'data' not in response.keys():
-                    results.append(book)
-                    continue
+
+            response, err = self._http_request(book['isbn'])
+            if err:
+                response, err = self._http_request(book['title']
+                                                   .replace(' ', '_').lower())
+            if err:
+                results.append(book)
+                continue
             data = response['data'][0]
             results.append({
                 'title': data['title'],
@@ -80,8 +77,20 @@ class Request(object):
                 'description': data['summary']
             })
         if rate is not None:
-            library.store(self._configuration, {'isbndb': {'rate': rate}})
+            storage.store(self._configuration, {'isbndb': {'rate': rate}})
         return results
+
+    def _http_request(self, query):
+        if query is None or len(query) <= 0:
+            return None, True
+        request = '%s/book/%s' % (self._request_base, query)
+        self._term.debug('Requesting %s', request)
+        response = requests.get(request)
+        if response.status_code != 200:
+            self._term.debug('Response from server was %d.', response.status_code)
+            return None, True
+        response_data = yaml.load(response.text)
+        return response_data, 'data' not in response_data.keys()
 
     def _keywords(self, data):
         """Takes an underscore-separated list of keywords and
