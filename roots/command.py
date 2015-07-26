@@ -186,6 +186,7 @@ class Fields(BaseCommand):
                 if field[0] is not '_':
                     fields.add(field)
         self.out('\n'.join(fields))
+        return None, None
 
 
 class Help(BaseCommand):
