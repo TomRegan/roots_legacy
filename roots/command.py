@@ -17,17 +17,21 @@
 """Commands.
 """
 
-from os.path import join, isfile, exists
+from __future__ import print_function
+
+from os.path import isfile, exists
 from inspect import getdoc
+from collections import namedtuple
 from texttable import Texttable
 import yaml
 
 from configuration import user_configuration, default_configuration
 from format import EpubFormat
-from isbndb import Request
+from isbndb import Service
 import storage
 import files
 
+Error = namedtuple('Error', 'reason')
 
 def command(arguments, configuration):
     """Returns an appropriate command.
@@ -55,6 +59,7 @@ class BaseCommand(object):
     def __init__(self, arguments, configuration):
         self._arguments = arguments
         self._configuration = configuration
+        self.out = print
 
     @property
     def name(self):
@@ -105,18 +110,19 @@ class List(BaseCommand):
         -> All known titles with ISBNs.
     """
 
-    def do(self):
+    def execute(self):
         """Loads the library metadata and selects entries from it.
         """
 
         restrict, select = self._parse_query()
         results = books_as_tuple(self._configuration, restrict, select)
         if len(results) == 0:
-            raise Exception("No matches for %s.", select)
+            return None, Error("No matches for %s." % select)
         elif self._configuration['list']['table'] or self._arguments['-t']:
             self._print_results_table(results)
         else:
             self._print_results(results)
+        return None, None
 
     def _parse_query(self):
         """Extract select and restrict operations from the query.
@@ -135,13 +141,13 @@ class List(BaseCommand):
         """
         if self._arguments['-a']:
             for author in sorted({result[0] for result in results}):
-                print author
+                self.out(author)
         elif self._configuration['list']['isbn'] or self._arguments['-i']:
             for result in sorted(results):
-                print "%s - %s - %s" % result
+                self.out("%s - %s - %s" % result)
         else:
             for result in sorted(results):
-                print "%s - %s" % result[:2]
+                self.out("%s - %s" % result[:2])
 
     def _print_results_table(self, results):
         """Print results formatted in a table.
@@ -163,7 +169,7 @@ class List(BaseCommand):
             if self._configuration['list']['isbn'] or self._arguments['-i']:
                 row += [isbn.encode('utf-8')]
             table.add_row(row)
-        print table.draw()
+        self.out(table.draw())
 
 
 class Fields(BaseCommand):
@@ -172,14 +178,14 @@ class Fields(BaseCommand):
     Synopsis: Shows fields that can be used in queries.
     """
 
-    def do(self):
+    def execute(self):
         books = storage.load(self._configuration, 'library')
         fields = set()
         for book in books:
             for field in book.keys():
                 if field[0] is not '_':
                     fields.add(field)
-        print '\n'.join(fields)
+        self.out('\n'.join(fields))
 
 
 class Help(BaseCommand):
@@ -199,16 +205,17 @@ class Help(BaseCommand):
             for command in BaseCommand.__subclasses__()
         }
 
-    def do(self):
+    def execute(self):
         """Prints documentation for the command.
         """
         command = self._arguments['<command>'].lower()
         if command in self._commands.keys():
-            print self._commands[command](self._arguments,
-                                          self._configuration).help
-            return
-        print 'No such command: ' + command
-        print self.help
+            self.out(self._commands[command]
+                     (self._arguments, self._configuration).help)
+            return None, None
+        self.out('No such command: ' + command)
+        self.out(self.help)
+        return None, None
 
     @property
     def help(self):
@@ -227,18 +234,19 @@ class Config(BaseCommand):
       -d,--default  Display configuration defaults.
     """
 
-    def do(self):
+    def execute(self):
         """Prints configuration.
         """
         if self._arguments['-p'] or self._arguments['--path']:
-            print self._configuration['system']['configfile']
+            self.out(self._configuration['system']['configfile'])
             return
         if self._arguments['-d'] or self._arguments['--default']:
             configuration = default_configuration()
         else:
             configuration = user_configuration()
         configuration.pop('system')
-        print yaml.dump(configuration, default_flow_style=False)
+        self.out(yaml.dump(configuration, default_flow_style=False))
+        return None, None
 
 
 class Update(BaseCommand):
@@ -247,13 +255,13 @@ class Update(BaseCommand):
     Synopsis: Updates the library.
     """
 
-    def do(self):
+    def execute(self):
         """Updates the library.
         """
         books = []
         directory = self._configuration['directory']
         if not exists(directory):
-            raise Exception('Cannot open library: %s', directory)
+            return None, Error('Cannot open library: %s' % directory)
         moves, books = files.find_moves(self._configuration, directory)
         moved = 0
         if self._configuration['import']['move']:
@@ -264,9 +272,10 @@ class Update(BaseCommand):
         if found > 0:
             storage.store(self._configuration, {'library': books})
 
-        print 'Updated %d %s, moved %d.' % (
+        self.out('Updated %d %s, moved %d.' % (
             found, found != 1 and 'books' or 'book', moved
-        )
+        ))
+        return None, None
 
 
 class Import(BaseCommand):
@@ -279,22 +288,23 @@ class Import(BaseCommand):
         -> imports books from ~/Downloads/
     """
 
-    def do(self):
+    def execute(self):
         """Imports new e-books.
         """
         srcpath = self._arguments['<path>']
         if isfile(srcpath):
-            raise Exception("Source path should not be a file: %s", srcpath)
+            return None, Error("Source path should not be a file: %s" % srcpath)
         directory = self._configuration['directory']
         if not exists(directory):
-            raise Exception('Cannot open library: %s', directory)
+            return None, Error('Cannot open library: %s' % directory)
         moves, books = files.find_moves(self._configuration,
                                         self._arguments['<path>'])
         count = files.move_to_library(self._configuration, moves)
         if count > 0:
             storage.update(self._configuration, 'library', books,
                            lambda x, y: x + y)
-        print 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
+        self.out('Imported %d %s.' % (count, count != 1 and 'books' or 'book'))
+        return None, None
 
 class Test(BaseCommand):
 
@@ -302,15 +312,16 @@ class Test(BaseCommand):
     Synopsis: Test the isbndb command.
     """
 
-    def do(self):
+    def execute(self):
         """Tests the ISBNDB command
         """
         restrict, select = self._parse_query()
         books = books_as_map(self._configuration, restrict, select)
-        request = Request(self._configuration)
-        print books
+        request = Service(self._configuration)
+        self.out(books)
         books = request.request(books)
-        print books
+        self.out(books)
+        return None, None
 
     def _parse_query(self):
         """Extract select and restrict operations from the query.

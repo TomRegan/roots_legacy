@@ -45,7 +45,7 @@ def default_configuration():
         },
         'isbndb' : {
             'key' : None,
-            'rate' : None
+            'limit' : None
         },
         'list': {
             'table': False,

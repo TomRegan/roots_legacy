@@ -79,22 +79,19 @@ class Terminal(blessings.Terminal):
 
 
 def do_command(arguments, configuration):
-    """TODO"""
+    """Executes a command.
+    """
     term = Terminal(configuration)
     configuration['terminal'] = term
     cmd = command(arguments, configuration)
-    try:
-        cmd.do()
-    except Exception, e:
-        if len(e.args) > 0:
-            term.warn(e.args[0], *e.args[1:])
-        else:
-            term.warn("Unknown error")
-        print_exc(e)
+    _, err = cmd.execute()
+    if err:
+        term.warn(err.reason)
 
 
 def main():
-    """TODO"""
+    """The entry point.
+    """
     arguments = docopt(__doc__, version='1.0.0')
     configuration = user_configuration()
     compile_regex(configuration)
