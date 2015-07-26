@@ -69,7 +69,7 @@ class Service(object):
                                     "Check the configuration.")
 
     _blacklist = set(['and', 'of', 'is', 'but', 'for', 'or', 'nor' 'from',
-                      'by', 'on', 'at', 'to', 'a', 'an', 'the', 'to', 'up'])
+                      'by', 'on', 'at', 'to', 'a', 'an', 'the', 'up'])
 
     def __init__(self, configuration):
         self._configuration = configuration
