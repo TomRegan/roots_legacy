@@ -27,8 +27,7 @@ def load(configuration, subject):
     """
     library_path = join(configuration['system']['configpath'],
                         configuration['library'])
-    configuration['terminal'].debug('loading %s (exists: %s)', library_path,
-                                    isfile(library_path))
+    print('loading %s (exists: %s)' % (library_path, isfile(library_path)))
     if not isfile(library_path):
         raise Exception('Cannot open library: %s', library_path)
     try:
@@ -44,8 +43,7 @@ def store(configuration, data):
     """
     library_path = join(configuration['system']['configpath'],
                         configuration['library'])
-    term = configuration['terminal']
-    term.debug('storing %s (exists: %s)', library_path, isfile(library_path))
+    print('storing %s (exists: %s)' % (library_path, isfile(library_path)))
     if not isfile(library_path):
         data['version'] = 1
     library = shelve.open(library_path)

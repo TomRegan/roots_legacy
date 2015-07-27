@@ -20,7 +20,6 @@
 import yaml
 
 from roots.isbndb import Service
-from ..roots import Terminal
 
 import responses
 import tempfile
@@ -282,7 +281,6 @@ class TestIsbndb(unittest.TestCase):
             'configpath': tempfile.mkdtemp()
         },
         'library': 'library.db',
-        'terminal': Terminal({'debug': False})
     }
 
 
