@@ -12,7 +12,7 @@ setup(name='roots',
       packages=['roots', 'roots.tests'],
       install_requires=[
           'pyyaml==3.11',
-          'click==4.1'
+          'click==4.1',
           'mkdocs==0.11.1',
           'requests==2.5.0',
           'texttable==0.8.1',
