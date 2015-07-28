@@ -113,7 +113,10 @@ def list(ctx, author, isbn, table, query):
           '--isbn': isbn
     }
     configuration = ctx.obj['configuration']
-    ret, _ = ctx.obj['factory'](arguments, configuration).execute()
+    ret, err = ctx.obj['factory'](arguments, configuration).execute()
+    if err:
+        print(err.reason)
+        return
     lines = ret.message.count('\n')
     _, height = get_terminal_size()
     # page if results are longer then a screen

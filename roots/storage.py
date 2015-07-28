@@ -53,7 +53,7 @@ def store(configuration, data, logger=None):
         library[subject] = entry
     library.close()
 
-def update(configuration, subject, data, function, logger):
+def update(configuration, subject, data, function, logger=None):
     """Updates data in the library.
     """
     try:
