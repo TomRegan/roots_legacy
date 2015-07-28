@@ -24,6 +24,8 @@ from click import (
     argument,
     command,
     confirm,
+    echo_via_pager,
+    get_terminal_size,
     group,
     option,
     pass_context,
@@ -111,35 +113,40 @@ def list(ctx, author, isbn, table, query):
           '--isbn': isbn
     }
     configuration = ctx.obj['configuration']
-    # TODO: factor out response
-    ctx.obj['factory'](arguments, configuration).execute()
+    ret, _ = ctx.obj['factory'](arguments, configuration).execute()
+    lines = ret.message.count('\n')
+    _, height = get_terminal_size()
+    # page if results are longer then a screen
+    if lines > height:
+        echo_via_pager(ret.message)
+    else:
+        print(ret.message)
 
 
 @cli.command(options_metavar='', add_help_option=False)
+@argument('query', nargs=-1, metavar='<query>...')
 @pass_context
-def update(ctx):
+def update(ctx, query):
     """Updates the library."""
     configuration = ctx.obj['configuration']
-    arguments = {'remote': True, '<query>': ['gone']}
-    if confirm("Do you want to look up data from a web service?"):
+    arguments = {'remote': True, '<query>': query}
+    if confirm("Do you want to use a web service to fetch information for titles, \
+like author, ISBN, and description?"):
         ctx.obj['factory'](arguments, configuration).execute()
-    arguments = {'update': True}
-    prune = configuration['import']['prune']
-    move = configuration['import']['move']
+
     msg = '''If you update the library\n\
     - Files will be %s\n\
     - Empty Directories will%sbe removed\n\
 These settings can be configured in %s''' % (
-    move and 'moved' or 'copied',
-    prune and ' ' or ' not ',
+    configuration['import']['move'] and 'moved' or 'copied',
+    configuration['import']['prune'] and ' ' or ' not ',
     configuration['system']['configfile']
 )
     print(msg)
     if confirm('Do you want to continue?'):
         print('\nBeginning update.')
-        return
-    # TODO: do something with this
-        ret, err = ctx.obj['factory'](arguments, configuration).execute()
+        arguments = {'update': True}
+        ctx.obj['factory'](arguments, configuration).execute()
     else:
         print('\nNot updating library.')
 

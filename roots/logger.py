@@ -14,23 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test for cli.
-"""
+import logging
 
-import unittest
-
-from files import _clean_path
-from cli import update
-from click.testing import CliRunner
-
-
-# TODO: test without click test framework
-class TestCli(unittest.TestCase):
-    def test_config_should_succeed(self):
-        runner = CliRunner()
-        result = runner.invoke(update)
-        #self.assertEqual(0, result.exit_code)
-
-
-if __name__ == '__main__':
-    unittest.main()
+def get_logger(name, configuration):
+    """Returns a logger."""
+    log = logging.getLogger(name)
+    if configuration is not None:
+        # TODO: read log level from config
+        pass
+    log.setLevel(logging.DEBUG)
+    # TODO: make handler configurable
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(name)-12s %(levelname)8s %(message)s',
+        '%Y-%m-%d %H:%M:%S'))
+    log.addHandler(handler)
+    return log

@@ -22,12 +22,13 @@ import pickle
 import shelve
 
 
-def load(configuration, subject):
+def load(configuration, subject, logger=None):
     """Returns data from the library.
     """
     library_path = join(configuration['system']['configpath'],
                         configuration['library'])
-    print('loading %s (exists: %s)' % (library_path, isfile(library_path)))
+    if logger is not None:
+        logger.debug('loading %s (exists: %s)', library_path, isfile(library_path))
     if not isfile(library_path):
         raise Exception('Cannot open library: %s', library_path)
     try:
@@ -38,12 +39,13 @@ def load(configuration, subject):
         library.close()
 
 
-def store(configuration, data):
+def store(configuration, data, logger=None):
     """Stores data in the library.
     """
     library_path = join(configuration['system']['configpath'],
                         configuration['library'])
-    print('storing %s (exists: %s)' % (library_path, isfile(library_path)))
+    if logger is not None:
+        logger.debug('storing %s (exists: %s)', library_path, isfile(library_path))
     if not isfile(library_path):
         data['version'] = 1
     library = shelve.open(library_path)
@@ -51,13 +53,13 @@ def store(configuration, data):
         library[subject] = entry
     library.close()
 
-def update(configuration, subject, data, function):
+def update(configuration, subject, data, function, logger):
     """Updates data in the library.
     """
     try:
-        existing_data = load(configuration, subject)
+        existing_data = load(configuration, subject, logger)
     except:
         existing_data = None
     if existing_data is not None:
         data = function(data, existing_data)
-    store(configuration, {subject: data})
+    store(configuration, {subject: data}, logger)

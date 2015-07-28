@@ -17,8 +17,6 @@
 """Classes for interacting with the isbndb web service.
 """
 
-from __future__ import print_function
-
 import yaml
 import requests
 
@@ -27,6 +25,7 @@ from collections import namedtuple
 from string import digits
 
 import storage
+import logger
 
 Rate = namedtuple('Rate', ['limit', 'date'])
 
@@ -38,21 +37,22 @@ class Service(object):
         """
         def __init__(self, configuration):
             self._configuration = configuration
+            self.log = logger.get_logger(self.__class__.__name__, configuration)
             limit = configuration['isbndb']['limit']
             today = date.today()
             try:
                 db = storage.load(configuration, 'isbndb')
                 self._rate = db['rate']
                 if self._rate.date < date.today():
-                    print("Resetting limit, expired %s" % self._rate.date)
+                    self.log.debug("Resetting limit, expired %s", self._rate.date)
                     self._rate = Rate(limit, today)
             except:
                 self._rate = Rate(limit, today)
             if self._rate is not None:
-                print('%s ISBNDB requests permitted on %s.' %
-                      (self._rate.limit, self._rate.date))
+                self.log.debug('%s ISBNDB requests permitted on %s.',
+                               self._rate.limit, self._rate.date)
             else:
-                print('ISBNDB requests not limited.')
+                self.log.debug('ISBNDB requests not limited.')
 
         def check(self):
             """Throws an exception if the throttle rate has been exhausted.
@@ -66,6 +66,7 @@ class Service(object):
                         }
                     })
                 else:
+                    # TODO: exception?
                     raise Exception("Calls to ISBNDB are throttled. "
                                     "Check the configuration.")
 
@@ -77,6 +78,7 @@ class Service(object):
         api_key = configuration['isbndb']['key']
         self._request_base = 'http://isbndb.com/api/v2/yaml/' + api_key
         self._throttle = self.Throttle(configuration)
+        self.log = logger.get_logger(self.__class__.__name__, configuration)
 
     def request(self, books):
         """Given a list of books, returns an updated list of
@@ -107,14 +109,14 @@ class Service(object):
         if query is None or len(query) <= 0:
             return None, True
         request = '%s/book/%s' % (self._request_base, query)
-        print('Requesting %s' % request)
+        self.log.debug('Requesting %s', request)
         response = requests.get(request)
         status = response.status_code
         if status != 200:
-            print('Response from server was %d.' % status)
+            self.log.debug('Response from server was %d.', status)
             return None, True
         response_data = yaml.load(response.text)
-        print('response: ' + str(response_data))
+        self.log.debug('Response: %s', str(response_data))
         return response_data, 'data' not in response_data.keys()
 
     def _keywords(self, data):

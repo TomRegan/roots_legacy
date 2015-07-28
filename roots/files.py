@@ -36,6 +36,7 @@ from format import EpubFormat
 def find_moves(configuration, rootpath):
     """Determines the files to be moved and their destinations.
     """
+    # TODO: needs a callback to update the user
     library = expanduser(configuration['directory'])
     moves, books = [], []
     for basepath, _, filenames in walk(rootpath):

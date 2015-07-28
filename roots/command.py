@@ -17,10 +17,7 @@
 """Commands.
 """
 
-from __future__ import print_function
-
 from os.path import isfile, exists, expanduser
-from inspect import getdoc
 from collections import namedtuple
 from texttable import Texttable
 import yaml
@@ -30,6 +27,9 @@ from format import EpubFormat
 from isbndb import Service
 import storage
 import files
+import logger
+
+
 
 Complete = namedtuple('Complete', 'message')
 Error = namedtuple('Error', 'reason')
@@ -55,7 +55,7 @@ class BaseCommand(object):
     def __init__(self, arguments, configuration):
         self._arguments = arguments
         self._configuration = configuration
-        self.out = print
+        self.log = logger.get_logger(self.__class__.__name__, configuration)
 
     @property
     def name(self):
@@ -92,10 +92,8 @@ class List(BaseCommand):
         if len(results) == 0:
             return None, Error("No matches for %s." % select)
         elif self._configuration['list']['table'] or self._arguments['-t']:
-            self._print_results_table(results)
-        else:
-            self._print_results(results)
-        return None, None
+            return Complete(self._print_results_table(results)), None
+        return Complete('\n'.join(self._print_results(results))), None
 
     def _parse_query(self):
         """Extract select and restrict operations from the query.
@@ -113,15 +111,17 @@ class List(BaseCommand):
     def _print_results(self, results):
         """Print author, title and ISBN depending on the option.
         """
+        buf = []
         if self._arguments['-a']:
             for author in sorted({result[0] for result in results}):
-                self.out(author)
+                buf.append(author)
         elif self._configuration['list']['isbn'] or self._arguments['-i']:
             for result in sorted(results):
-                self.out("%s - %s - %s" % result)
+                buf.append("%s - %s - %s" % result)
         else:
             for result in sorted(results):
-                self.out("%s - %s" % result[:2])
+                buf.append("%s - %s" % result[:2])
+        return buf
 
     def _print_results_table(self, results):
         """Print results formatted in a table.
@@ -143,13 +143,13 @@ class List(BaseCommand):
             if self._configuration['list']['isbn'] or self._arguments['-i']:
                 row += [isbn.encode('utf-8')]
             table.add_row(row)
-        self.out(table.draw())
+        return table.draw()
 
 
 class Fields(BaseCommand):
 
     def execute(self):
-        books = storage.load(self._configuration, 'library')
+        books = storage.load(self._configuration, 'library', self.log)
         fields = set()
         for book in books:
             for field in book.keys():
@@ -195,7 +195,7 @@ class Update(BaseCommand):
         # here we begin the database update
         found = len(books)
         if found > 0:
-            storage.store(self._configuration, {'library': books})
+            storage.store(self._configuration, {'library': books}, self.log)
 
         msg = 'Updated %d %s, moved %d.' % (
             found, found != 1 and 'books' or 'book', moved
@@ -219,7 +219,7 @@ class Import(BaseCommand):
         count = files.move_to_library(self._configuration, moves)
         if count > 0:
             storage.update(self._configuration, 'library', books,
-                           lambda x, y: x + y)
+                           lambda x, y: x + y, logger=self.log)
         msg = 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
         return Complete(msg), None
 
@@ -231,9 +231,9 @@ class RemoteLookup(BaseCommand):
         restrict, select = self._parse_query()
         books = books_as_map(self._configuration, restrict, select)
         request = Service(self._configuration)
-        self.out(books)
+        self.log.debug(books)
         books = request.request(books)
-        self.out(books)
+        self.log.debug(books)
         return None, None
 
     def _parse_query(self):
