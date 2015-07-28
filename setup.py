@@ -9,7 +9,7 @@ setup(name='roots',
       author_email='code.tom.regan@gmail.com',
       url='https://github.com/TomRegan/roots',
       license="http://www.apache.org/licenses/LICENSE-2.0",
-      packages=['roots', 'roots.tests'],
+      packages=['roots'],
       install_requires=[
           'pyyaml==3.11',
           'click==4.1',
