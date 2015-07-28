@@ -17,10 +17,7 @@
 """Commands.
 """
 
-from __future__ import print_function
-
-from os.path import isfile, exists
-from inspect import getdoc
+from os.path import isfile, exists, expanduser
 from collections import namedtuple
 from texttable import Texttable
 import yaml
@@ -30,47 +27,42 @@ from format import EpubFormat
 from isbndb import Service
 import storage
 import files
+import logger
 
+
+
+Complete = namedtuple('Complete', 'message')
 Error = namedtuple('Error', 'reason')
 
 def command(arguments, configuration):
-    """Returns an appropriate command.
-    """
-    if arguments['import']:
+    """Returns an appropriate command."""
+    if 'import' in arguments and arguments['import']:
         return Import(arguments, configuration)
-    elif arguments['update']:
+    if 'update' in arguments and  arguments['update']:
         return Update(arguments, configuration)
-    elif arguments['config']:
+    if 'config' in arguments and arguments['config']:
         return Config(arguments, configuration)
-    elif arguments['list']:
+    if 'list' in arguments and arguments['list']:
         return List(arguments, configuration)
-    elif arguments['help']:
-        return Help(arguments, configuration)
-    elif arguments['fields']:
+    if 'fields' in arguments and arguments['fields']:
         return Fields(arguments, configuration)
-    elif arguments['test']:
-        return Test(arguments, configuration)
+    if 'remote' in arguments and arguments['remote']:
+        return RemoteLookup(arguments, configuration)
 
 
 class BaseCommand(object):
-
-    """Base command class.
-    """
+    """Base command class."""
     def __init__(self, arguments, configuration):
         self._arguments = arguments
         self._configuration = configuration
-        self.out = print
+        self.log = logger.get_logger(self.__class__.__name__, configuration)
 
     @property
     def name(self):
         return self.__class__.__name__
 
-    @property
-    def help(self):
-        return getdoc(self)
 
-
-#TODO move into a separate module
+# TODO: move into a separate module
 def books_as_tuple(configuration, restrict='title', select=None):
     return [(book['author'], book['title'], book['isbn'])
             for book in _query(configuration, restrict, select)]
@@ -91,25 +83,6 @@ def _query(configuration, restrict='title', select=None):
 
 class List(BaseCommand):
 
-    """Usage: root list [-ait] [<query>]...
-    Synopsis: Queries the library.
-
-    Options:
-      -a  Show a list of matching authors.
-      -i  Show the ISBN number of each title.
-      -t  Print the matches in a table.
-
-    Examples:
-      root list author:forster
-        -> All titles by Forster.
-
-      root list -a howards end
-        -> All authors of matching titles.
-
-      root list -i
-        -> All known titles with ISBNs.
-    """
-
     def execute(self):
         """Loads the library metadata and selects entries from it.
         """
@@ -119,10 +92,8 @@ class List(BaseCommand):
         if len(results) == 0:
             return None, Error("No matches for %s." % select)
         elif self._configuration['list']['table'] or self._arguments['-t']:
-            self._print_results_table(results)
-        else:
-            self._print_results(results)
-        return None, None
+            return Complete(self._print_results_table(results)), None
+        return Complete('\n'.join(self._print_results(results))), None
 
     def _parse_query(self):
         """Extract select and restrict operations from the query.
@@ -131,7 +102,8 @@ class List(BaseCommand):
         if user_query:
             if ':' in user_query[0]:
                 restrict, select = user_query[0].split(':')
-                return restrict, ' '.join([select] + user_query[1:])
+                select += ' '.join([s for s in user_query[1:]])
+                return restrict, select
             else:
                 return 'title', ' '.join(user_query)
         return None, None
@@ -139,15 +111,17 @@ class List(BaseCommand):
     def _print_results(self, results):
         """Print author, title and ISBN depending on the option.
         """
+        buf = []
         if self._arguments['-a']:
             for author in sorted({result[0] for result in results}):
-                self.out(author)
+                buf.append(author)
         elif self._configuration['list']['isbn'] or self._arguments['-i']:
             for result in sorted(results):
-                self.out("%s - %s - %s" % result)
+                buf.append("%s - %s - %s" % result)
         else:
             for result in sorted(results):
-                self.out("%s - %s" % result[:2])
+                buf.append("%s - %s" % result[:2])
+        return buf
 
     def _print_results_table(self, results):
         """Print results formatted in a table.
@@ -169,92 +143,38 @@ class List(BaseCommand):
             if self._configuration['list']['isbn'] or self._arguments['-i']:
                 row += [isbn.encode('utf-8')]
             table.add_row(row)
-        self.out(table.draw())
+        return table.draw()
 
 
 class Fields(BaseCommand):
 
-    """Usage: root fields
-    Synopsis: Shows fields that can be used in queries.
-    """
-
     def execute(self):
-        books = storage.load(self._configuration, 'library')
+        books = storage.load(self._configuration, 'library', self.log)
         fields = set()
         for book in books:
             for field in book.keys():
                 if field[0] is not '_':
                     fields.add(field)
-        self.out('\n'.join(fields))
-        return None, None
-
-
-class Help(BaseCommand):
-
-    """Usage: root help [%s]
-    Synopsis: Shows help for a command.
-
-    Examples:
-      root help list
-        -> Shows help for the list command.
-    """
-
-    def __init__(self, arguments, configuration):
-        super(Help, self).__init__(arguments, configuration)
-        self._commands = {
-            command.__name__.lower(): command
-            for command in BaseCommand.__subclasses__()
-        }
-
-    def execute(self):
-        """Prints documentation for the command.
-        """
-        command = self._arguments['<command>'].lower()
-        if command in self._commands.keys():
-            self.out(self._commands[command]
-                     (self._arguments, self._configuration).help)
-            return None, None
-        self.out('No such command: ' + command)
-        self.out(self.help)
-        return None, None
-
-    @property
-    def help(self):
-        """Returns help string.
-        """
-        return getdoc(self) % ' | '.join(sorted(self._commands.keys()))
+        return Complete('\n'.join(fields)), None
 
 
 class Config(BaseCommand):
-
-    """Usage: root config [-p | --path | -d | --default]
-    Synopsis: Shows the configuration.
-
-    Options:
-      -p,--path     Display the configuration file path.
-      -d,--default  Display configuration defaults.
-    """
 
     def execute(self):
         """Prints configuration.
         """
         if self._arguments['-p'] or self._arguments['--path']:
-            self.out(self._configuration['system']['configfile'])
-            return
+            return Complete(self._configuration['system']['configfile']), None
         if self._arguments['-d'] or self._arguments['--default']:
             configuration = default_configuration()
         else:
             configuration = user_configuration()
         configuration.pop('system')
-        self.out(yaml.dump(configuration, default_flow_style=False))
-        return None, None
+        msg = yaml.dump(configuration, default_flow_style=False)
+        return Complete(msg), None
 
 
 class Update(BaseCommand):
-
-    """Usage: root update
-    Synopsis: Updates the library.
-    """
 
     def execute(self):
         """Updates the library.
@@ -265,29 +185,25 @@ class Update(BaseCommand):
             return None, Error('Cannot open library: %s' % directory)
         moves, books = files.find_moves(self._configuration, directory)
         moved = 0
+        # if the user has chosen the move option, they'll be renamed
+        # according to their new author / title, otherwise just
+        # update the database
         if self._configuration['import']['move']:
             moved = files.move_to_library(self._configuration, moves)
             if self._configuration['import']['prune']:
                 files.prune(self._configuration)
+        # here we begin the database update
         found = len(books)
         if found > 0:
-            storage.store(self._configuration, {'library': books})
+            storage.store(self._configuration, {'library': books}, self.log)
 
-        self.out('Updated %d %s, moved %d.' % (
+        msg = 'Updated %d %s, moved %d.' % (
             found, found != 1 and 'books' or 'book', moved
-        ))
-        return None, None
+        )
+        return Complete(msg), None
 
 
 class Import(BaseCommand):
-
-    """Usage: root import <path>
-    Synopsis: Imports new e-books.
-
-    Examples:
-      root import ~/Downloads/
-        -> imports books from ~/Downloads/
-    """
 
     def execute(self):
         """Imports new e-books.
@@ -295,7 +211,7 @@ class Import(BaseCommand):
         srcpath = self._arguments['<path>']
         if isfile(srcpath):
             return None, Error("Source path should not be a file: %s" % srcpath)
-        directory = self._configuration['directory']
+        directory = expanduser(self._configuration['directory'])
         if not exists(directory):
             return None, Error('Cannot open library: %s' % directory)
         moves, books = files.find_moves(self._configuration,
@@ -303,30 +219,25 @@ class Import(BaseCommand):
         count = files.move_to_library(self._configuration, moves)
         if count > 0:
             storage.update(self._configuration, 'library', books,
-                           lambda x, y: x + y)
-        self.out('Imported %d %s.' % (count, count != 1 and 'books' or 'book'))
-        return None, None
+                           lambda x, y: x + y, logger=self.log)
+        msg = 'Imported %d %s.' % (count, count != 1 and 'books' or 'book')
+        return Complete(msg), None
 
-class Test(BaseCommand):
 
-    """Usage: root test [<query>]...
-    Synopsis: Test the isbndb command.
-    """
+class RemoteLookup(BaseCommand):
 
     def execute(self):
-        """Tests the ISBNDB command
-        """
+        """Looks up book data from ISBNDB"""
         restrict, select = self._parse_query()
         books = books_as_map(self._configuration, restrict, select)
         request = Service(self._configuration)
-        self.out(books)
+        self.log.debug(books)
         books = request.request(books)
-        self.out(books)
+        self.log.debug(books)
         return None, None
 
     def _parse_query(self):
-        """Extract select and restrict operations from the query.
-        """
+        """Extract select and restrict operations from the query."""
         user_query = self._arguments['<query>']
         if user_query:
             if ':' in user_query[0]:

@@ -17,8 +17,18 @@
 """File operations.
 """
 
+from __future__ import print_function
+
 from os import walk, makedirs, rmdir
-from os.path import join, isfile, dirname, basename, exists, normpath, samefile
+from os.path import (
+    join,
+    isfile,
+    dirname,
+    basename,
+    exists,
+    samefile,
+    expanduser
+)
 from shutil import copy2 as _copy, move as _move
 from format import EpubFormat
 
@@ -26,8 +36,8 @@ from format import EpubFormat
 def find_moves(configuration, rootpath):
     """Determines the files to be moved and their destinations.
     """
-    library = configuration['directory']
-    terminal = configuration['terminal']
+    # TODO: needs a callback to update the user
+    library = expanduser(configuration['directory'])
     moves, books = [], []
     for basepath, _, filenames in walk(rootpath):
         for filename in filenames:
@@ -42,14 +52,14 @@ def find_moves(configuration, rootpath):
                 dstfile = _clean_path(configuration, book['title'] + '.epub')
             except Exception, e:
                 if len(e.args) > 0:
-                    terminal.warn("Not importing %s because " +
-                                  str(e.args[0]).lower(), srcpath)
+                    print("Not importing %s because " +
+                          str(e.args[0]).lower() % srcpath)
                 continue
             dstpath = join(dstdir, dstfile)
             overwrite = configuration['import']['overwrite']
             if rootpath != library and not overwrite and isfile(dstpath):
-                terminal.warn("Not importing %s because it already "
-                              "exists in the library.", srcpath)
+                print("Not importing %s because it already "
+                      "exists in the library." % srcpath)
                 continue
             # if Update, all books, moves if path is wrong
             if samefile(rootpath, library):
@@ -57,7 +67,7 @@ def find_moves(configuration, rootpath):
                     moves.append((srcpath, dstpath))
                 books.append(book)
             # if Import, all new books and moves
-            elif not samefile(srcpath, dstpath):
+            elif not exists(dstpath) or not samefile(srcpath, dstpath):
                 moves.append((srcpath, dstpath))
                 books.append(book)
     return moves, books
@@ -74,7 +84,6 @@ def _clean_path(configuration, srcpath):
 def move_to_library(configuration, moves, move=_copy):
     """Move files to the library
     """
-    terminal = configuration['terminal']
     if [configuration['import']['move']]:
         move = _move
     else:
@@ -86,15 +95,15 @@ def move_to_library(configuration, moves, move=_copy):
             if not exists(destdir):
                 makedirs(destdir)
         except OSError:
-            terminal.warn("Error creating path %s", destdir)
+            print("Error creating path %s" % destdir)
             continue
-        print "%s ->\n%s" % (basename(srcpath), destpath)
+        print("%s ->\n%s" % (basename(srcpath), destpath))
         try:
             move(srcpath, destpath)
             moved += 1
         except IOError, ioe:
-            terminal.warn("Error importing %s (%s)", srcpath, ioe.errno)
-    terminal.debug('_move_to_library() -> %d', moved)
+            print("Error importing %s (%s)" % srcpath, ioe.errno)
+    print('_move_to_library() -> %d' % moved)
     return moved
 
 def prune(configuration):

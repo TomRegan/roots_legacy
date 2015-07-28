@@ -39,63 +39,20 @@ Options:
   --version  Show version.
 """
 
-import blessings
-
-from docopt import docopt
-from traceback import print_exc
-
-from command import command
 from configuration import user_configuration, compile_regex
-from format import EpubFormat
-
-
-class Terminal(blessings.Terminal):
-    """Allows interaction with the terminal.
-    """
-
-    def __init__(self, configuration):
-        super(Terminal, self).__init__()
-        self._configuration = configuration
-
-    def _prefmt(self, pre, colour):
-        return self.underline + colour + pre + self.normal + ": "
-
-    def warn(self, msg, *args):
-        """Write a warning message to the terminal.
-        """
-        replace_fmt = "'" + self.red + "%s" + self.normal +  "'"
-        if '%s' in str(msg):
-            print (self._prefmt('Error', self.red)
-                   + str(msg).replace('%s', replace_fmt)
-                   + self.normal) % args
-        else:
-            print self._prefmt('Error', self.red) + str(msg)
-
-    def debug(self, msg, *args):
-        """Write a debug message to the terminal.
-        """
-        if self._configuration['debug']:
-            print (self._prefmt('Debug', self.blue) + msg) % args
-
-
-def do_command(arguments, configuration):
-    """Executes a command.
-    """
-    term = Terminal(configuration)
-    configuration['terminal'] = term
-    cmd = command(arguments, configuration)
-    _, err = cmd.execute()
-    if err:
-        term.warn(err.reason)
+from command import command
+from cli import cli
 
 
 def main():
     """The entry point.
     """
-    arguments = docopt(__doc__, version='1.0.0')
     configuration = user_configuration()
     compile_regex(configuration)
-    do_command(arguments, configuration)
+    cli(obj={
+        'configuration': configuration,
+        'factory': command
+    })
 
 
 if __name__ == '__main__':

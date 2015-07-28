@@ -20,11 +20,12 @@
 import yaml
 import requests
 
-from datetime import date, timedelta
+from datetime import date
 from collections import namedtuple
 from string import digits
 
 import storage
+import logger
 
 Rate = namedtuple('Rate', ['limit', 'date'])
 
@@ -35,23 +36,23 @@ class Service(object):
         """Enforces rate-throttling behaviour to limit excessive api calls.
         """
         def __init__(self, configuration):
-            term = configuration['terminal']
             self._configuration = configuration
+            self.log = logger.get_logger(self.__class__.__name__, configuration)
+            limit = configuration['isbndb']['limit']
+            today = date.today()
             try:
                 db = storage.load(configuration, 'isbndb')
                 self._rate = db['rate']
                 if self._rate.date < date.today():
-                    term.debug("Resetting limit, expired %s" % self._rate.date)
-                    self._rate = Rate(limit=configuration['isbndb']['limit'],
-                                      date=date.today())
+                    self.log.debug("Resetting limit, expired %s", self._rate.date)
+                    self._rate = Rate(limit, today)
             except:
-                self._rate = Rate(limit=configuration['isbndb']['limit'],
-                                  date=date.today())
+                self._rate = Rate(limit, today)
             if self._rate is not None:
-                term.debug('%s ISBNDB requests permitted on %s.',
-                           self._rate.limit, self._rate.date)
+                self.log.debug('%s ISBNDB requests permitted on %s.',
+                               self._rate.limit, self._rate.date)
             else:
-                term.debug('ISBNDB requests not limited.')
+                self.log.debug('ISBNDB requests not limited.')
 
         def check(self):
             """Throws an exception if the throttle rate has been exhausted.
@@ -65,6 +66,7 @@ class Service(object):
                         }
                     })
                 else:
+                    # TODO: exception?
                     raise Exception("Calls to ISBNDB are throttled. "
                                     "Check the configuration.")
 
@@ -75,8 +77,8 @@ class Service(object):
         self._configuration = configuration
         api_key = configuration['isbndb']['key']
         self._request_base = 'http://isbndb.com/api/v2/yaml/' + api_key
-        self._term = configuration['terminal']
         self._throttle = self.Throttle(configuration)
+        self.log = logger.get_logger(self.__class__.__name__, configuration)
 
     def request(self, books):
         """Given a list of books, returns an updated list of
@@ -94,28 +96,27 @@ class Service(object):
                 continue
             data = response['data'][0]
             results.append({
-                'title': data['title'],
-                'author': self._author(data),
-                'isbn': data['isbn13'],
-                'keywords': self._keywords(data),
+                      'title': data['title'],
+                     'author': self._author(data),
+                       'isbn': data['isbn13'],
+                   'keywords': self._keywords(data),
                 'description': data['summary']
             })
         return results
 
     def _http_request(self, query):
-        """Sends an http request.
-        """
+        """Sends an http request."""
         if query is None or len(query) <= 0:
             return None, True
         request = '%s/book/%s' % (self._request_base, query)
-        self._term.debug('Requesting %s', request)
+        self.log.debug('Requesting %s', request)
         response = requests.get(request)
         status = response.status_code
         if status != 200:
-            self._term.debug('Response from server was %d.', status)
+            self.log.debug('Response from server was %d.', status)
             return None, True
         response_data = yaml.load(response.text)
-        self._term.debug('response: ' + str(response_data))
+        self.log.debug('Response: %s', str(response_data))
         return response_data, 'data' not in response_data.keys()
 
     def _keywords(self, data):
