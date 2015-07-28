@@ -19,8 +19,8 @@
 
 import unittest
 
-from roots.configuration import default_configuration, compile_regex
-from roots.files import _clean_path
+from configuration import default_configuration, compile_regex
+from files import _clean_path
 
 
 class FilesTest(unittest.TestCase):

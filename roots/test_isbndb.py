@@ -19,7 +19,7 @@
 
 import yaml
 
-from roots.isbndb import Service
+from isbndb import Service
 
 import responses
 import tempfile

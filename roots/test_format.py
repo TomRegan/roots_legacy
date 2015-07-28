@@ -19,7 +19,7 @@
 
 import unittest
 
-from roots.format import BaseFormat
+from format import BaseFormat
 import xml.etree.ElementTree as etree
 
 
