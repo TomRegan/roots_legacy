@@ -95,13 +95,13 @@ class Service(object):
                 results.append(book)
                 continue
             data = response['data'][0]
-            results.append({
+            results.append({k:v for k, v in {
                       'title': data['title'],
                      'author': self._author(data),
                        'isbn': data['isbn13'],
                    'keywords': self._keywords(data),
                 'description': data['summary']
-            })
+            }.iteritems() if len(v) > 0})
         return results
 
     def _http_request(self, query):
@@ -125,12 +125,12 @@ class Service(object):
         and digits stripped.
         """
         subject_ids = data['subject_ids']
-        return { keyword for keyword in {
+        return [ keyword for keyword in {
             keyword.translate(None, digits) for subject_ids in
             [subject_id.split('_') for subject_id in subject_ids]
             for keyword in subject_ids
             if keyword not in self._blacklist
-        } if len(keyword) > 0 }
+        } if len(keyword) > 3 ]
 
     def _author(self, data):
         return data['author_data'][0]['name']

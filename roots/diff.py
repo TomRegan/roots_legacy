@@ -17,16 +17,16 @@
 from collections import namedtuple
 from difflib import SequenceMatcher
 
-Add = namedtuple('Add', 'text')
-Same = namedtuple('Same', 'text')
-Delete = namedtuple('Delete', 'text')
-Replace = namedtuple('Replace', 'text')
+Added = namedtuple('Added', 'text')
+Removed = namedtuple('Removed', 'text')
+Modified = namedtuple('Modified', 'text')
+Unchanged = namedtuple('Unchanged', 'text')
 
 def diff(original, replacement):
     result = {}
     for key in replacement.keys():
         if not key in original and key in replacement:
-            result[key] = [Add(replacement[key])]
+            result[key] = [Added(replacement[key])]
         if key in original and key in replacement:
             matcher = SequenceMatcher(
                 a=original[key],
@@ -36,15 +36,15 @@ def diff(original, replacement):
             for opcode in opcodes:
                 if opcode[0] == 'insert':
                     start, end = opcode[3], opcode[4]
-                    chunks.append(Add(replacement[key][start:end]))
+                    chunks.append(Added(replacement[key][start:end]))
                 if opcode[0] == 'replace':
                     start, end = opcode[3], opcode[4]
-                    chunks.append(Replace(replacement[key][start:end]))
+                    chunks.append(Modified(replacement[key][start:end]))
                 if opcode[0] == 'delete':
                     start, end = opcode[1], opcode[2]
-                    chunks.append(Delete(original[key][start:end]))
+                    chunks.append(Removed(original[key][start:end]))
                 if opcode[0] == 'equal':
                     start, end = opcode[1], opcode[2]
-                    chunks.append(Same(original[key][start:end]))
+                    chunks.append(Unchanged(original[key][start:end]))
                 result[key] = chunks
     return result

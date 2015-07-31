@@ -16,13 +16,13 @@
 
 import unittest
 
-from diff import diff, Add, Same, Delete, Replace
+from diff import diff, Added, Removed, Modified, Unchanged
 
 class TestDiff(unittest.TestCase):
     def test_addition_is_tagged(self):
         expected = {
-            'title': [Add('Gone Girl')],
-            'author': [Add('Gillian Flynn')]
+            'title': [Added('Gone Girl')],
+            'author': [Added('Gillian Flynn')]
         }
         actual = diff({}, {
             'title': 'Gone Girl',
@@ -32,19 +32,19 @@ class TestDiff(unittest.TestCase):
         self.equalTypes(expected, actual)
 
     def test_removal_is_tagged(self):
-        expected = {'title': [Same('Gone'), Delete(' Girl')]}
+        expected = {'title': [Unchanged('Gone'), Removed(' Girl')]}
         actual = diff({'title': 'Gone Girl'}, {'title': 'Gone'})
         self.assertEqual(expected, actual)
         self.equalTypes(expected, actual)
 
     def test_insertion_is_tagged(self):
-        expected = {'title': [Add('Gone '), Same('Girl')]}
+        expected = {'title': [Added('Gone '), Unchanged('Girl')]}
         actual = diff({'title': 'Girl'}, {'title': 'Gone Girl'})
         self.assertEqual(expected, actual)
         self.equalTypes(expected, actual)
 
     def test_replacement_is_tagged(self):
-        expected = {'title': [Same('G'), Replace('irl')]}
+        expected = {'title': [Unchanged('G'), Modified('irl')]}
         actual = diff({'title': 'Gone'}, {'title': 'Girl'})
         self.assertEqual(expected, actual)
         self.equalTypes(expected, actual)

@@ -135,7 +135,10 @@ def update(ctx, query):
     arguments = {'remote': True, '<query>': query}
     if confirm("Do you want to use a web service to fetch information for titles, \
 like author, ISBN, and description?"):
-        ctx.obj['factory'](arguments, configuration).execute()
+        ret, _ = ctx.obj['factory'](arguments, configuration).execute()
+        for book in ret.message:
+            for key, value in book.iteritems():
+                print("%12s: %s" % (key, value))
 
     msg = '''If you update the library\n\
     - Files will be %s\n\

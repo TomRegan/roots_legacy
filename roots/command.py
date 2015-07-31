@@ -25,6 +25,7 @@ import yaml
 from configuration import user_configuration, default_configuration
 from format import EpubFormat
 from isbndb import Service
+from diff import diff
 import storage
 import files
 import logger
@@ -229,12 +230,13 @@ class RemoteLookup(BaseCommand):
     def execute(self):
         """Looks up book data from ISBNDB"""
         restrict, select = self._parse_query()
-        books = books_as_map(self._configuration, restrict, select)
+        old_books = books_as_map(self._configuration, restrict, select)
         request = Service(self._configuration)
-        self.log.debug(books)
-        books = request.request(books)
-        self.log.debug(books)
-        return None, None
+        new_books = request.request(old_books)
+        books = [book for  book in
+                 [diff(a, b) for a, b in zip(old_books, new_books)]
+                ]
+        return Complete(books), None
 
     def _parse_query(self):
         """Extract select and restrict operations from the query."""
