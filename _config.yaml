@@ -1,4 +1,4 @@
-directory: /Volumes/books/epub
+directory: ~/Books
 
 import:
   overwrite: no
