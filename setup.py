@@ -11,7 +11,7 @@ setup(name='roots',
       license="http://www.apache.org/licenses/LICENSE-2.0",
       packages=['roots'],
       install_requires=[
-          'pyyaml==4.2b4',
+          'pyyaml==5.4',
           'click==4.1',
           'mkdocs==0.11.1',
           'requests==2.21.0',
