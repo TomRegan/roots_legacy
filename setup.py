@@ -14,7 +14,7 @@ setup(name='roots',
           'pyyaml==5.4',
           'click==4.1',
           'mkdocs==0.11.1',
-          'requests==2.21.0',
+          'requests==2.31.0',
           'texttable==0.8.1',
           # Tests
           'nose==1.3.4',
